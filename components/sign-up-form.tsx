@@ -14,18 +14,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Role } from "@/lib/types";
 
 export function SignUpForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const [role, setRole] = useState<Role>("candidate");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // Landing-page CTAs link here with ?role=recruiter|candidate
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("role");
+    if (r === "recruiter" || r === "candidate") setRole(r);
+  }, []);
 
   const handleSignUp = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,6 +54,8 @@ export function SignUpForm({
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
+          // AUTH-3: read by the handle_new_user trigger to create the profile with this role
+          data: { role, full_name: fullName.trim() },
         },
       });
       if (error) throw error;
@@ -66,6 +77,35 @@ export function SignUpForm({
         <CardContent>
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
+              <div className="grid gap-2">
+                <Label>I am</Label>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup">
+                  {(["candidate", "recruiter"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      role="radio"
+                      aria-checked={role === r}
+                      onClick={() => setRole(r)}
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                        role === r ? "border-primary bg-primary/15 text-primary" : "border-input hover:bg-accent",
+                      )}
+                    >
+                      {r === "candidate" ? "Looking for a job" : "Hiring"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="full-name">Full name</Label>
+                <Input
+                  id="full-name"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

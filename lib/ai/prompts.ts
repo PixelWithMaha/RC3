@@ -88,3 +88,113 @@ export const ResumeParseZ = z.object({
     .catch([]),
 });
 export type ResumeParseOutput = z.infer<typeof ResumeParseZ>;
+
+// ---------------------------------------------------------------- Job requirement extraction (JOB-7)
+export const JOB_EXTRACT_SYSTEM = `You extract structured hiring requirements from a free-text job description.
+Return ONLY requirements stated or clearly implied by the text. Never invent requirements.
+
+Rules:
+- required_skills: skills described as required / must-have / essential, or core to the role.
+- preferred_skills: skills described as nice-to-have / preferred / a plus / bonus.
+- A skill appears in only one list. Use canonical names ("Postgres" -> "PostgreSQL", "JS" -> "JavaScript",
+  "RESTful APIs" -> "REST API"). Keep each skill short (1-4 words); no soft skills unless explicitly required.
+- importance (integer 1-5): 5 = critical/explicitly required, 4 = clearly required, 3 = important,
+  2 = useful, 1 = minor. Base it on emphasis and wording in the text.
+- min_experience_years: minimum years of experience stated (number), or 0 if not stated.
+- qualifications: degrees, certifications or other formal qualifications stated (short phrases), [] if none.`;
+
+export function jobExtractPrompt(description: string): string {
+  return `Extract the requirements from this job description.\n\n<job_description>\n${description}\n</job_description>`;
+}
+
+const skillReq = {
+  type: "object",
+  properties: { name: { type: "string" }, importance: { type: "integer", minimum: 1, maximum: 5 } },
+  required: ["name", "importance"],
+};
+
+export const JOB_EXTRACT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    required_skills: { type: "array", items: skillReq },
+    preferred_skills: { type: "array", items: skillReq },
+    min_experience_years: { type: "number", minimum: 0 },
+    qualifications: { type: "array", items: { type: "string" } },
+  },
+  required: ["required_skills", "preferred_skills", "min_experience_years", "qualifications"],
+} as const;
+
+const zSkillReq = z.object({ name: z.string().min(1), importance: z.coerce.number() });
+export const JobExtractZ = z.object({
+  required_skills: z.array(zSkillReq).catch([]),
+  preferred_skills: z.array(zSkillReq).catch([]),
+  min_experience_years: z.coerce.number().catch(0),
+  qualifications: z.array(z.string()).catch([]),
+});
+export type JobExtractOutput = z.infer<typeof JobExtractZ>;
+
+// ---------------------------------------------------------------- Matching (MATCH-1..3, GAP-1..4)
+export const MATCH_SYSTEM = `You assess how well an anonymized candidate matches a job, using ONLY the resume evidence given.
+You do not decide hiring outcomes; you produce evidence for a human recruiter.
+
+For EVERY listed job skill (required and preferred) return one assessment:
+- status "full": clear evidence of the skill or a direct equivalent (semantic match, e.g. "built REST endpoints in Flask"
+  satisfies "REST API"; "Postgres" satisfies "PostgreSQL").
+- status "partial": related/adjacent evidence only (e.g. MySQL for PostgreSQL, Flask for Django).
+- status "not_mentioned": no evidence either way (missing evidence).
+- status "explicitly_lacking": the resume explicitly states the candidate lacks it (e.g. "no backend experience").
+- resume_skill: the candidate skill that matched (or null).
+- excerpt: a short VERBATIM quote (5-25 words) copied exactly from the resume that supports the status; "" if not_mentioned.
+- learning_suggestion: one concrete learning area for partial/not_mentioned/explicitly_lacking; "" for full.
+
+Also score 0-100: experience_score (relevance + years vs minimum), project_score (relevance of projects),
+qualification_score (stated qualifications vs required). Give one-sentence notes for each, and a 2-3 sentence
+plain-language summary. Never mention or infer name, gender, age, nationality, religion or other personal attributes.`;
+
+export function matchPrompt(job: unknown, resume: unknown): string {
+  return `<job>\n${JSON.stringify(job)}\n</job>\n\n<anonymized_resume>\n${JSON.stringify(resume)}\n</anonymized_resume>`;
+}
+
+export const MATCH_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    requirements: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          skill: { type: "string" },
+          status: { type: "string", enum: ["full", "partial", "not_mentioned", "explicitly_lacking"] },
+          resume_skill: { type: ["string", "null"] },
+          excerpt: { type: "string" },
+          learning_suggestion: { type: "string" },
+        },
+        required: ["skill", "status", "resume_skill", "excerpt", "learning_suggestion"],
+      },
+    },
+    experience_score: { type: "number" },
+    project_score: { type: "number" },
+    qualification_score: { type: "number" },
+    experience_note: { type: "string" },
+    project_note: { type: "string" },
+    qualification_note: { type: "string" },
+    summary: { type: "string" },
+  },
+  required: ["requirements", "experience_score", "project_score", "qualification_score",
+    "experience_note", "project_note", "qualification_note", "summary"],
+} as const;
+
+const zNum = z.coerce.number().catch(0);
+export const MatchZ = z.object({
+  requirements: z.array(z.object({
+    skill: z.string(),
+    status: z.enum(["full", "partial", "not_mentioned", "explicitly_lacking"]).catch("not_mentioned"),
+    resume_skill: z.string().nullable().catch(null),
+    excerpt: z.string().catch(""),
+    learning_suggestion: z.string().catch(""),
+  })),
+  experience_score: zNum, project_score: zNum, qualification_score: zNum,
+  experience_note: z.string().catch(""), project_note: z.string().catch(""),
+  qualification_note: z.string().catch(""), summary: z.string().catch(""),
+});
+export type MatchOutput = z.infer<typeof MatchZ>;

@@ -36,3 +36,7 @@ export async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<
   if (!r.success) return jsonError("Invalid input: " + r.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; "), 400);
   return r.data;
 }
+
+/** Job columns returned to clients (embedding excluded). */
+export const JOB_COLUMNS =
+  "id, recruiter_id, title, department, location, type, salary_min, salary_max, description, required_skills, preferred_skills, min_experience_years, qualifications, status, created_at, updated_at";

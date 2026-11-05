@@ -1,11 +1,15 @@
 // Data functions the UI calls (browser side). lib/mock-api.ts must keep the same signatures.
 // AI work always goes through app/api/* routes; nothing here touches AI keys.
 import { createClient } from "@/lib/supabase/client";
-import type { ParseResumeResponse, ParsedResume, Resume } from "@/lib/types";
+import type {
+  ApplicationEvent, ApplicationStatus, CandidateInterview, Job, JobExtraction, JobStatus, JobWithCounts,
+  MatchResponse, Notification, ParseResumeResponse, ParsedResume, RankedApplication, RecruiterNote, Resume,
+} from "@/lib/types";
+import type { JobCreateInput, JobUpdateInput } from "@/lib/validation";
 
-async function postJSON<T>(url: string, body: unknown): Promise<T> {
+async function postJSON<T>(url: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<T> {
   const res = await fetch(url, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -88,4 +92,249 @@ export async function getResumeFileUrl(filePath: string): Promise<string> {
   const { data, error } = await supabase.storage.from("resumes").createSignedUrl(filePath, 60 * 10);
   if (error || !data) throw new Error(error?.message ?? "Could not create link");
   return data.signedUrl;
+}
+
+// ---------------------------------------------------------------- Jobs (JOB-1..8)
+
+const JOB_COLUMNS =
+  "id, recruiter_id, title, department, location, type, salary_min, salary_max, description, required_skills, preferred_skills, min_experience_years, qualifications, status, created_at, updated_at";
+
+/** JOB-7: AI extracts requirements from a free-text description. Recruiter reviews before saving. */
+export async function extractJobRequirements(description: string): Promise<JobExtraction> {
+  return postJSON<JobExtraction>("/api/job/extract", { description });
+}
+
+/** JOB-1: create (validated + embedded server-side). */
+export async function createJob(input: JobCreateInput): Promise<Job> {
+  return postJSON<Job>("/api/jobs", input);
+}
+
+/** JOB-2: edit. Re-embeds server-side when content changes. */
+export async function updateJob(id: string, input: JobUpdateInput): Promise<Job> {
+  return postJSON<Job>(`/api/jobs/${id}`, input, "PATCH");
+}
+
+/** JOB-3: close / reopen (no AI call). */
+export async function setJobStatus(id: string, status: JobStatus): Promise<Job> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("jobs").update({ status }).eq("id", id).select(JOB_COLUMNS).single();
+  if (error || !data) throw new Error(error?.message ?? "Could not update job");
+  return data as Job;
+}
+
+/** JOB-6: recruiter's own vacancies with applicant counts, newest first. */
+export async function getRecruiterJobs(): Promise<JobWithCounts[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  const { data, error } = await supabase
+    .from("jobs_with_counts")
+    .select(JOB_COLUMNS + ", applicant_count, shortlisted_count")
+    .eq("recruiter_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as JobWithCounts[];
+}
+
+/** Open vacancies for candidates, newest first. */
+export async function getOpenJobs(): Promise<Job[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("jobs")
+    .select(JOB_COLUMNS)
+    .eq("status", "open")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Job[];
+}
+
+/** Single job (RLS: open jobs, or the recruiter's own). Null if not found / not visible. */
+export async function getJob(id: string): Promise<Job | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data as Job | null;
+}
+
+// ---------------------------------------------------------------- Applications: candidate (PIPE-1/2)
+
+async function requireUserId(): Promise<string> {
+  const { data: { user } } = await createClient().auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  return user.id;
+}
+
+/**
+ * PIPE-1: apply with the latest successfully parsed resume, then score once (MATCH-1..3).
+ * If scoring fails the application still exists; `matchError` explains and a recruiter can re-score.
+ */
+export async function applyToJob(jobId: string): Promise<{ applicationId: string; match: MatchResponse | null; matchError?: string }> {
+  const supabase = createClient();
+  const userId = await requireUserId();
+  const { data: resume } = await supabase
+    .from("resumes")
+    .select("id")
+    .eq("candidate_id", userId)
+    .eq("parse_status", "success")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!resume) throw new Error("Upload and parse your resume before applying.");
+
+  const { data: app, error } = await supabase
+    .from("applications")
+    .insert({ job_id: jobId, candidate_id: userId, resume_id: resume.id })
+    .select("id")
+    .single();
+  if (error || !app) {
+    throw new Error(error?.code === "23505" ? "You have already applied to this job." : "Could not apply: " + (error?.message ?? "unknown error"));
+  }
+  try {
+    const match = await postJSON<MatchResponse>("/api/match", { applicationId: app.id });
+    return { applicationId: app.id, match };
+  } catch (e) {
+    return { applicationId: app.id, match: null, matchError: (e as Error).message };
+  }
+}
+
+/** PIPE-2: my applications with job title + status (override fields are always null for candidates). */
+export async function getMyApplications(): Promise<RankedApplication[]> {
+  const userId = await requireUserId();
+  const { data, error } = await createClient()
+    .from("applications_ranked")
+    .select("*")
+    .eq("candidate_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as RankedApplication[];
+}
+
+/** Candidate-safe status history (no reasons). */
+export async function getMyApplicationTimeline(applicationId: string): Promise<{ to_status: ApplicationStatus; created_at: string }[]> {
+  const { data, error } = await createClient().rpc("get_my_application_timeline", { p_application_id: applicationId });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function getMyInterviews(): Promise<CandidateInterview[]> {
+  const { data, error } = await createClient().rpc("get_my_interviews");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------- Applications: recruiter (MATCH-4..6, PIPE-3..5)
+
+export interface ApplicantFilters {
+  minScore?: number;
+  status?: ApplicationStatus;
+  skill?: string; // matched skill name
+  sort?: "score" | "newest";
+}
+
+/** MATCH-4/5: ranked applicants for a job (effective score = override ?? AI score). */
+export async function getJobApplicants(jobId: string, f: ApplicantFilters = {}): Promise<RankedApplication[]> {
+  let q = createClient().from("applications_ranked").select("*").eq("job_id", jobId);
+  if (f.status) q = q.eq("status", f.status);
+  if (f.minScore != null) q = q.gte("effective_score", f.minScore);
+  q = f.sort === "newest"
+    ? q.order("created_at", { ascending: false })
+    : q.order("effective_score", { ascending: false, nullsFirst: false });
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  let rows = (data ?? []) as RankedApplication[];
+  if (f.skill) {
+    const k = f.skill.toLowerCase();
+    rows = rows.filter((r) => r.ai_explanation?.matched.some((m) => m.skill.toLowerCase() === k));
+  }
+  return rows;
+}
+
+/** Application detail incl. the parsed resume (recruiter view). */
+export async function getApplication(applicationId: string): Promise<(RankedApplication & { resume: Pick<Resume, "id" | "file_path" | "file_name" | "parsed" | "is_verified"> | null }) | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("applications_ranked").select("*").eq("id", applicationId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const { data: resume } = await supabase
+    .from("resumes")
+    .select("id, file_path, file_name, parsed, is_verified")
+    .eq("id", data.resume_id)
+    .maybeSingle();
+  return { ...(data as RankedApplication), resume };
+}
+
+/** GAP-5 / explicit re-score (recruiter). */
+export async function rescoreApplication(applicationId: string): Promise<MatchResponse> {
+  return postJSON<MatchResponse>("/api/match", { applicationId });
+}
+
+/** PIPE-3: manual status change; the DB validates the transition and writes the audit event. */
+export async function changeApplicationStatus(applicationId: string, to: ApplicationStatus, reason?: string): Promise<void> {
+  const { error } = await createClient().rpc("change_application_status", {
+    p_application_id: applicationId,
+    p_to_status: to,
+    p_reason: reason ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** MATCH-6: override with a mandatory reason (logged in the audit trail). */
+export async function overrideScore(applicationId: string, score: number, reason: string): Promise<void> {
+  const { error } = await createClient().rpc("override_application_score", {
+    p_application_id: applicationId,
+    p_score: score,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** PIPE-5: full audit trail (recruiter only via RLS). */
+export async function getApplicationEvents(applicationId: string): Promise<ApplicationEvent[]> {
+  const { data, error } = await createClient()
+    .from("application_events")
+    .select("*")
+    .eq("application_id", applicationId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ApplicationEvent[];
+}
+
+/** PIPE-4: private recruiter notes. */
+export async function getNotes(applicationId: string): Promise<RecruiterNote[]> {
+  const { data, error } = await createClient()
+    .from("recruiter_notes")
+    .select("*")
+    .eq("application_id", applicationId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as RecruiterNote[];
+}
+
+export async function addNote(applicationId: string, note: string): Promise<RecruiterNote> {
+  const trimmed = note.trim();
+  if (!trimmed) throw new Error("Note is empty");
+  const userId = await requireUserId();
+  const { data, error } = await createClient()
+    .from("recruiter_notes")
+    .insert({ application_id: applicationId, recruiter_id: userId, note: trimmed.slice(0, 5000) })
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Could not save note");
+  return data as RecruiterNote;
+}
+
+// ---------------------------------------------------------------- Notifications (INT-6)
+export async function getNotifications(): Promise<Notification[]> {
+  const { data, error } = await createClient()
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Notification[];
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const { error } = await createClient().from("notifications").update({ read: true }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
