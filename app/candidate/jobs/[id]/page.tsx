@@ -5,8 +5,8 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, CheckCircle2, MapPin, Wallet, Wand2 } from "lucide-react";
 import { applyToJob, getJob, getMyApplications, getMyResume } from "@/lib/api";
-import { assessSkill, findSkillSpans, resumeSources } from "@/lib/ai/evidence";
-import type { Job, Resume, SkillRequirement } from "@/lib/types";
+import { computeFit } from "@/lib/ai/fit";
+import type { Job, Resume } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/app/badges";
 import { Hero, JobMark, PipelineStepper, ScoreRing, stagger } from "@/components/app/kit";
@@ -96,16 +96,7 @@ export default function JobDetail() {
 
 /** Side by side: what the job requires ↔ what your resume shows (computed from real resume evidence). */
 function FitComparison({ job, resume }: { job: Job; resume: Resume }) {
-  const sources = resumeSources(resume.parsed!, resume.raw_text);
-  const rows = [...job.required_skills.map((s) => ({ ...s, required: true })), ...job.preferred_skills.map((s) => ({ ...s, required: false }))]
-    .map((req) => {
-      const own = resume.parsed!.skills.find((s) => findSkillSpans(s.name, req.name).length > 0 || findSkillSpans(req.name, s.name).length > 0);
-      const ev = assessSkill(req.name, own?.excerpt ?? "", sources);
-      return { req, ev };
-    });
-  const weight = (r: SkillRequirement & { required: boolean }) => r.importance * (r.required ? 1 : 0.5);
-  const total = rows.reduce((t, r) => t + weight(r.req), 0) || 1;
-  const fit = Math.round((rows.reduce((t, r) => t + weight(r.req) * (r.ev.tier === "proven" ? 1 : r.ev.tier === "listed" ? 0.6 : 0), 0) / total) * 100);
+  const { fit, rows } = computeFit(job, resume.parsed!, resume.raw_text);
 
   return (
     <section style={stagger(0)} className="dash-card rounded-2xl border border-border bg-surface p-6">
@@ -120,7 +111,7 @@ function FitComparison({ job, resume }: { job: Job; resume: Resume }) {
         <span>Job requires</span><span>Your resume shows</span>
       </div>
       <div className="space-y-2">
-        {rows.map(({ req, ev }, i) => (
+        {rows.map(({ req, ev, related }, i) => (
           <div key={req.name} style={stagger(i + 2, 50)} className="dash-slide grid gap-2 sm:grid-cols-2">
             <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2.5">
               <span className="font-medium">{req.name}{!req.required && <span className="ml-1.5 text-[11px] text-muted-foreground">nice to have</span>}</span>
@@ -129,8 +120,13 @@ function FitComparison({ job, resume }: { job: Job; resume: Resume }) {
               </span>
             </div>
             <div className={cn("rounded-xl border px-3 py-2.5 text-sm",
-              ev.tier === "proven" ? "border-matched/40 bg-matched/5" : ev.tier === "listed" ? "border-missing/40 bg-missing/5" : "border-dashed border-absent/40 bg-absent/5")}>
-              {ev.best ? (
+              ev.tier === "proven" ? "border-matched/40 bg-matched/5" : ev.tier === "listed" || related ? "border-missing/40 bg-missing/5" : "border-dashed border-absent/40 bg-absent/5")}>
+              {!ev.best && related?.ev.best ? (
+                <>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-missing">≈ Related: {related.skill} · partial credit · {related.ev.best.label}</span>
+                  <p className="mt-0.5 line-clamp-2 font-mono text-xs text-foreground/80">{related.ev.best.text}</p>
+                </>
+              ) : ev.best ? (
                 <>
                   <span className={cn("text-[11px] font-semibold uppercase tracking-wider", ev.tier === "proven" ? "text-matched" : "text-missing")}>
                     {ev.tier === "proven" ? "✓ Proven" : "Listed only"} · {ev.best.label}

@@ -83,6 +83,6 @@ export default function CandidateJobs() {
 async function load() {
   const [jobs, resume, apps] = await Promise.all([getOpenJobs(), getMyResume(), getMyApplications()]);
   const fit = new Map<string, { score: number; matched: string[] }>();
-  if (resume?.parsed) for (const r of recommendJobs(jobs, { parsed: resume.parsed })) fit.set(r.job.id, { score: r.score, matched: r.matched });
+  if (resume?.parsed) for (const r of recommendJobs(jobs, { parsed: resume.parsed, raw_text: resume.raw_text })) fit.set(r.job.id, { score: r.fit, matched: r.matched });
   return { jobs, fit, applied: new Set(apps.map((a) => a.job_id)) };
 }

@@ -501,7 +501,7 @@ export async function runFairnessTest(applicationId: string): Promise<FairnessTe
   return postJSON<FairnessTestResponse>("/api/fairness-test", { applicationId });
 }
 
-export interface JobRecommendation { job: Job; score: number; reason: string; matched: string[]; missing: string[] }
+export interface JobRecommendation { job: Job; score: number; fit: number; tier: "strong" | "good" | "stretch"; eligible: boolean; reason: string; matched: string[]; missing: string[] }
 
 /** TI-4: open jobs ranked for the signed-in candidate (excludes jobs already applied to). */
 export async function getRecommendations(): Promise<{ jobs: JobRecommendation[]; needsResume?: boolean }> {

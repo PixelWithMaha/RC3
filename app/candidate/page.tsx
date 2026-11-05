@@ -107,11 +107,16 @@ function Recommended() {
   return (
     <section className="mt-8">
       <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Recommended for you</h2>
-      <p className="mb-3 text-sm text-muted-foreground">Ranked by your verified skills, project experience, interests and resume meaning.</p>
+      <p className="mb-3 text-sm text-muted-foreground">Only jobs your resume shows real evidence for. The % is the same fit you see on each job page.</p>
       {loading && <Loading className="py-4" />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {data?.needsResume && <Empty title="Upload your resume to get recommendations" action={<Button asChild size="sm"><Link href="/candidate/resume">Upload resume</Link></Button>} />}
-      {data && !data.needsResume && data.jobs.length === 0 && <Empty title="No new jobs to recommend">You&apos;ve applied to every open role. Check back soon.</Empty>}
+      {data && !data.needsResume && data.jobs.length === 0 && (
+        <Empty art="jobs" title="No strong matches right now"
+          action={<div className="flex gap-2"><Button asChild size="sm"><Link href="/candidate/jobs">Browse all jobs</Link></Button><Button asChild size="sm" variant="outline"><Link href="/candidate/coach">Open resume coach</Link></Button></div>}>
+          We only recommend jobs your resume shows real evidence for. New roles appear here as they&apos;re posted.
+        </Empty>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         {data?.jobs.map((r) => (
           <Link key={r.job.id} href={`/candidate/jobs/${r.job.id}`} className="dash-card rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60">
@@ -120,7 +125,10 @@ function Recommended() {
                 <p className="font-heading font-semibold">{r.job.title}</p>
                 <p className="text-xs text-muted-foreground">{[r.job.location, r.job.type].filter(Boolean).join(" · ")}</p>
               </div>
-              <span className="rounded-lg border border-matched/50 px-2 py-0.5 font-heading text-lg font-bold text-matched">{r.score}</span>
+              <div className="text-right">
+                <span className={r.tier === "strong" ? "rounded-lg border border-matched/50 px-2 py-0.5 font-heading text-lg font-bold text-matched" : "rounded-lg border border-missing/50 px-2 py-0.5 font-heading text-lg font-bold text-missing"}>{r.fit}%</span>
+                <p className="mt-1 text-[11px] text-muted-foreground">{r.tier === "strong" ? "Strong fit" : r.tier === "good" ? "Good fit" : "Partial fit"}</p>
+              </div>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{r.reason}</p>
           </Link>

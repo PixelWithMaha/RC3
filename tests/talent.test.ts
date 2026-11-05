@@ -37,19 +37,25 @@ const job = (id: string, title: string, req: string[], extra: Partial<Job> = {})
   ({ id, title, status: "open", department: null, description: "", required_skills: req.map((name) => ({ name, importance: 4 })), preferred_skills: [], ...extra } as unknown as Job);
 
 describe("recommendations (TI-4)", () => {
-  it("ranks by verified skills + project tech, skips applied/closed jobs, ignores unverified skills", () => {
+  const raw = "Skills: Python, Django, Kubernetes\nBuilt Django APIs. ShopAPI: Django + Docker";
+  it("ranks by evidence fit, skips applied/closed jobs, and only recommends jobs with real evidence", () => {
     const recs = recommendJobs(
-      [job("1", "Backend", ["Python", "Django", "Docker"]), job("2", "DevOps", ["Kubernetes"]), job("3", "Closed", ["Python"], { status: "closed" }), job("4", "Applied", ["Python"])],
-      { parsed: resume }, [], new Set(["4"]),
+      [job("1", "Backend", ["Python", "Django", "Docker"]), job("2", "Rust", ["Rust", "Wasm"]), job("3", "Closed", ["Python"], { status: "closed" }), job("4", "Applied", ["Python"])],
+      { parsed: resume, raw_text: raw }, [], new Set(["4"]),
     );
     expect(recs.map((r) => r.job.id)).toEqual(["1", "2"]);
-    expect(recs[0].matched).toEqual(["Python", "Django", "Docker"]);
-    expect(recs[1].missing).toEqual(["Kubernetes"]); // unverified skill doesn't count
+    expect(recs[0].eligible).toBe(true);
+    expect(recs[1]).toMatchObject({ eligible: false, fit: 0, missing: ["Rust", "Wasm"] });
+  });
+  it("similarity alone can't make a job look like a fit", () => {
+    const [r] = recommendJobs([{ ...job("1", "Rust", ["Rust"]), embedding: "[1,0]" }], { parsed: resume, raw_text: raw, embedding: "[1,0]" });
+    expect(r.score).toBeLessThanOrEqual(15);
+    expect(r.eligible).toBe(false);
   });
   it("adds a small interest boost", () => {
-    const [a] = recommendJobs([job("1", "Data platform", ["Rust"])], { parsed: resume }, ["data"]);
-    const [b] = recommendJobs([job("1", "Data platform", ["Rust"])], { parsed: resume }, []);
-    expect(a.score).toBeGreaterThan(b.score);
+    const [a] = recommendJobs([job("1", "Data platform", ["Python"])], { parsed: resume, raw_text: raw }, ["data"]);
+    const [b] = recommendJobs([job("1", "Data platform", ["Python"])], { parsed: resume, raw_text: raw }, []);
+    expect(a.score - b.score).toBe(5);
   });
 });
 

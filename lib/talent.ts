@@ -1,6 +1,6 @@
 // Pure talent-intelligence helpers (TI-3, TI-4, TI-7). No I/O; unit-tested.
 import type { Job, ParsedResume } from "@/lib/types";
-import { normalizeSkill, sameSkill } from "@/lib/ai/normalize";
+import { computeFit } from "@/lib/ai/fit";
 
 // ---------------------------------------------------------------- vectors
 /** pgvector comes back from PostgREST as "[0.1,0.2,…]". */
@@ -38,37 +38,46 @@ export function buildCounterfactual(p: ParsedResume): Counterfactual {
 }
 
 // ---------------------------------------------------------------- TI-4 recommendations
-export interface Recommendation { job: Job; score: number; reason: string; matched: string[]; missing: string[] }
+export type FitTier = "strong" | "good" | "stretch";
+export interface Recommendation {
+  job: Job; score: number; fit: number; tier: FitTier; eligible: boolean;
+  reason: string; matched: string[]; missing: string[];
+}
 
-/** 60% semantic similarity (embeddings) + 35% verified skill overlap (importance-weighted) + 5% interest match. */
+/** Gemini embeddings of any tech resume vs any tech job sit around 0.55–0.75, so rescale before use. */
+export const scaleSimilarity = (cos: number) => Math.min(1, Math.max(0, (cos - 0.55) / 0.3));
+
+/**
+ * score = 80% evidence-based fit (same as the job page) + 15% rescaled resume↔job meaning + 5% interests.
+ * Only jobs with real evidence (fit ≥ 30 and at least one required skill shown) are eligible to recommend.
+ */
 export function recommendJobs(
   jobs: (Job & { embedding?: unknown })[],
-  resume: { parsed: ParsedResume; embedding?: unknown },
+  resume: { parsed: ParsedResume; raw_text?: string | null; embedding?: unknown },
   interests: string[] = [],
   appliedJobIds: Set<string> = new Set(),
 ): Recommendation[] {
   const rv = parseVector(resume.embedding);
-  const verified = resume.parsed.skills.filter((s) => s.verified).map((s) => s.name);
-  const projectTech = resume.parsed.projects.flatMap((p) => p.technologies);
-  const have = [...verified, ...projectTech];
   return jobs
     .filter((j) => j.status === "open" && !appliedJobIds.has(j.id))
     .map((job) => {
-      const reqs = [...job.required_skills.map((s) => ({ ...s, w: s.importance })), ...job.preferred_skills.map((s) => ({ ...s, w: s.importance / 2 }))];
-      const total = reqs.reduce((t, r) => t + r.w, 0) || 1;
-      const hit = reqs.filter((r) => have.some((h) => sameSkill(h, r.name)));
-      const overlap = hit.reduce((t, r) => t + r.w, 0) / total;
+      const f = computeFit(job, resume.parsed, resume.raw_text ?? null);
       const jv = parseVector(job.embedding);
-      const sim = rv && jv ? Math.max(0, cosine(rv, jv)) : overlap;
+      const sim = rv && jv ? scaleSimilarity(cosine(rv, jv)) : 0;
       const text = `${job.title} ${job.department ?? ""} ${job.description}`.toLowerCase();
       const interest = interests.some((i) => i.trim() && text.includes(i.trim().toLowerCase())) ? 1 : 0;
-      const score = Math.round((0.6 * sim + 0.35 * overlap + 0.05 * interest) * 100);
-      const matched = hit.map((r) => normalizeSkill(r.name));
-      const missing = job.required_skills.filter((r) => !have.some((h) => sameSkill(h, r.name))).map((r) => r.name);
-      const reason = matched.length
-        ? `Your resume shows ${matched.slice(0, 4).join(", ")}${matched.length > 4 ? ` +${matched.length - 4} more` : ""}${missing.length ? `; not yet shown: ${missing.slice(0, 3).join(", ")}` : ""}.`
-        : "Related to your experience by meaning, though no listed skill matches exactly.";
-      return { job, score, reason: interest ? `${reason} Matches your interests.` : reason, matched, missing };
+      const score = Math.min(100, Math.round(0.8 * f.fit + 15 * sim + 5 * interest));
+      const shownRequired = job.required_skills.some((r) => !f.requiredMissing.includes(r.name)); // proven, listed or related
+      const eligible = f.fit >= 30 && (shownRequired || !job.required_skills.length);
+      const matched = [...f.proven, ...f.listed];
+      const parts = [
+        f.proven.length && `Proven: ${f.proven.slice(0, 4).join(", ")}`,
+        f.listed.length && `Listed: ${f.listed.slice(0, 3).join(", ")}`,
+        f.related.length && `Related: ${f.related.slice(0, 2).join(", ")}`,
+        f.requiredMissing.length && `Not in your resume: ${f.requiredMissing.slice(0, 3).join(", ")}${f.requiredMissing.length > 3 ? ` +${f.requiredMissing.length - 3}` : ""}`,
+      ].filter(Boolean) as string[];
+      const reason = (parts.length ? parts.join(" · ") : "No listed skill appears in your resume yet.") + (interest ? " · Matches your interests." : "");
+      return { job, score, fit: f.fit, tier: (f.fit >= 70 ? "strong" : f.fit >= 45 ? "good" : "stretch") as FitTier, eligible, reason, matched, missing: f.requiredMissing };
     })
     .sort((a, b) => b.score - a.score);
 }
