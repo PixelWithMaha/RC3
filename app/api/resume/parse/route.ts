@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
+import mammoth from "mammoth";
 import { jsonError, parseBody, requireUser } from "@/lib/api-server";
 import { AIError, embedTexts, generateJSON, toPgVector } from "@/lib/ai/gemini";
 import { RESUME_PARSE_JSON_SCHEMA, RESUME_PARSE_SYSTEM, ResumeParseZ, resumeParsePrompt } from "@/lib/ai/prompts";
@@ -12,6 +13,7 @@ import {
   buildParsedResume,
   chunkText,
   cleanText,
+  isDocx,
   isPdf,
   resumeEmbeddingText,
 } from "@/lib/ai/resume";
@@ -45,31 +47,36 @@ export async function POST(req: Request) {
     return NextResponse.json(res, { status: http });
   };
 
-  // 1. Type check by name (RES-7). DOCX is P2.
-  if (!/\.pdf$/i.test(resume.file_name)) {
-    return fail("failed", "Unsupported file type. Please upload a PDF resume.", 415);
-  }
+  // 1. Type check by name (RES-7). PDF (RES-1) or DOCX (RES-2).
+  const kind = /\.pdf$/i.test(resume.file_name) ? "pdf" : /\.docx$/i.test(resume.file_name) ? "docx" : null;
+  if (!kind) return fail("failed", "Unsupported file type. Please upload a PDF or DOCX resume.", 415);
 
-  // 2. Download from the private bucket
+  // 2. Download from the private bucket + check the real file signature
   const { data: blob, error: dlErr } = await supabase.storage.from("resumes").download(resume.file_path);
   if (dlErr || !blob) return fail("failed", "Could not read the uploaded file. Please upload it again.", 404);
   if (blob.size > MAX_RESUME_BYTES) return fail("failed", "File too large. Maximum size is 5 MB.", 413);
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  if (!isPdf(bytes)) return fail("failed", "This file is not a valid PDF.", 415);
+  if (kind === "pdf" && !isPdf(bytes)) return fail("failed", "This file is not a valid PDF.", 415);
+  if (kind === "docx" && !isDocx(bytes)) return fail("failed", "This file is not a valid DOCX document.", 415);
 
   // 3. Extract text
   let rawText: string;
   try {
-    const pdf = await getDocumentProxy(bytes);
-    const { text } = await extractText(pdf, { mergePages: true });
-    rawText = cleanText(Array.isArray(text) ? text.join("\n") : text);
+    if (kind === "pdf") {
+      const pdf = await getDocumentProxy(bytes);
+      const { text } = await extractText(pdf, { mergePages: true });
+      rawText = cleanText(Array.isArray(text) ? text.join("\n") : text);
+    } else {
+      const { value } = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
+      rawText = cleanText(value);
+    }
   } catch {
-    return fail("failed", "Could not read this PDF. It may be corrupted or password-protected.", 422);
+    return fail("failed", `Could not read this ${kind.toUpperCase()}. It may be corrupted or password-protected.`, 422);
   }
   if (rawText.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
     return fail(
       "empty",
-      "No extractable text found. The PDF may be a scanned image — please upload a text-based PDF.",
+      kind === "pdf" ? "No extractable text found. The PDF may be a scanned image — please upload a text-based PDF." : "This document has no readable text.",
       422,
       rawText,
     );

@@ -44,3 +44,11 @@ describe("text helpers", () => {
     expect(isPdf(new TextEncoder().encode("PK\u0003\u0004"))).toBe(false);
   });
 });
+
+import { isDocx } from "@/lib/ai/resume";
+describe("isDocx", () => {
+  it("detects the ZIP signature used by .docx", () => {
+    expect(isDocx(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14]))).toBe(true);
+    expect(isDocx(new TextEncoder().encode("%PDF-1.7"))).toBe(false);
+  });
+});

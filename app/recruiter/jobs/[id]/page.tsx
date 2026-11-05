@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Columns3, Pencil } from "lucide-react";
 import { getJob, getJobApplicants, type ApplicantFilters } from "@/lib/api";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { Empty, ErrorState, Loading, PageHeader, useAsync } from "@/components/a
 export default function JobApplicants() {
   const { id } = useParams<{ id: string }>();
   const [filters, setFilters] = useState<ApplicantFilters>({ sort: "score" });
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 4 ? p : [...p, id]));
   const job = useAsync(() => getJob(id), [id]);
   const apps = useAsync(() => getJobApplicants(id, filters), [id, JSON.stringify(filters)]);
 
@@ -26,8 +28,15 @@ export default function JobApplicants() {
     <>
       <PageHeader
         title={job.data.title}
-        description="Applicants ranked by AI relevance (or your override). The AI never changes a status — you do."
-        actions={<Button asChild variant="outline"><Link href={`/recruiter/jobs/${id}/edit`}><Pencil className="h-4 w-4" /> Edit job</Link></Button>}
+        description="Applicants ranked by AI relevance (or your override). Tick 2–4 to compare side by side. The AI never changes a status — you do."
+        actions={
+          <>
+            {picked.length >= 2 && (
+              <Button asChild><Link href={`/recruiter/compare?ids=${picked.join(",")}`}><Columns3 className="h-4 w-4" /> Compare {picked.length}</Link></Button>
+            )}
+            <Button asChild variant="outline"><Link href={`/recruiter/jobs/${id}/edit`}><Pencil className="h-4 w-4" /> Edit job</Link></Button>
+          </>
+        }
       />
       <div className="mb-4 flex flex-wrap gap-3">
         <Input type="number" min={0} max={100} placeholder="Min score" className="w-32"
@@ -52,7 +61,16 @@ export default function JobApplicants() {
       <div className="space-y-2">
         {apps.data?.map((a, rank) => (
           <Link key={a.id} href={`/recruiter/applications/${a.id}`}
+            onClick={(e) => { if ((e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}
             className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              aria-label={`Select ${a.candidate_name ?? "candidate"} to compare`}
+              checked={picked.includes(a.id)}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => togglePick(a.id)}
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
+            />
             <span className="w-6 text-sm text-muted-foreground">#{rank + 1}</span>
             <ScorePill score={a.ai_score} override={a.override_score} />
             <div className="min-w-0 flex-1">

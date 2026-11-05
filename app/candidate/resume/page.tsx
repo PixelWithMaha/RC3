@@ -52,8 +52,8 @@ export default function ResumePage() {
 
   const onFile = (file?: File) => {
     if (!file) return;
-    if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
-      setUploadErr(`“${file.name}” is not a PDF. Convert it and try again.`);
+    if (!/\.(pdf|docx)$/i.test(file.name)) {
+      setUploadErr(`“${file.name}” is not a PDF or DOCX. Convert it and try again.`);
       setPhase("error");
       return;
     }
@@ -76,9 +76,9 @@ export default function ResumePage() {
               <FileText className="h-4 w-4 text-primary" /> <b>{resume.file_name}</b>
             </span>
           )}
-          <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
           <Button disabled={phase === "busy"} onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4" /> {resume ? "Upload new PDF" : "Upload PDF"}
+            <Upload className="h-4 w-4" /> {resume ? "Upload new resume" : "Upload PDF or DOCX"}
           </Button>
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function ResumePage() {
         <div className="mt-6 rounded-[18px] border border-dashed border-border bg-surface px-6 py-14 text-center">
           <FileText className="mx-auto mb-3 h-8 w-8 text-primary" />
           <p className="font-heading text-lg font-semibold">Upload your resume to get started</p>
-          <p className="mt-1 text-sm text-muted-foreground">A text-based PDF, up to 5 MB. Scanned images can&apos;t be read.</p>
+          <p className="mt-1 text-sm text-muted-foreground">A text-based PDF or a Word (.docx) file, up to 5 MB. Scanned images can&apos;t be read.</p>
         </div>
       )}
 

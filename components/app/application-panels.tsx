@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CalendarPlus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarPlus, RefreshCw, Scale, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import {
+  runFairnessTest, type FairnessTestResponse,
   addNote, changeApplicationStatus, deleteQuestion, generateQuestions, getApplicationEvents, getInterviews,
   getNotes, getQuestions, overrideScore, saveInterviewFeedback, scheduleInterview, updateQuestion,
 } from "@/lib/api";
@@ -351,5 +352,53 @@ function InterviewRow({ interview: i, onSaved }: { interview: Awaited<ReturnType
         </form>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- fairness counterfactual (TI-7)
+export function FairnessCard({ applicationId }: { applicationId: string }) {
+  const [r, setR] = useState<FairnessTestResponse | null>(null);
+  const action = useAction();
+  const fair = r && Math.abs(r.difference) <= 2;
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base"><Scale className="h-4 w-4 text-primary" /> Fairness test</CardTitle>
+          <CardDescription>Change name, gender, age, contact, nationality and religion, then re-score both versions.</CardDescription>
+        </div>
+        <Button size="sm" variant="outline" disabled={!!action.busy} onClick={() => action.run("ft", async () => setR(await runFairnessTest(applicationId)))}>
+          {action.busy ? "Running…" : r ? "Run again" : "Run test"}
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {action.busy && <Loading className="py-2" label="Scoring the original and the counterfactual…" />}
+        {action.error && <ErrorState message={action.error} />}
+        {r && (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-secondary p-2"><p className="text-xs text-muted-foreground">Original</p><p className="font-heading text-2xl font-bold">{Math.round(r.original_score)}</p></div>
+              <div className="rounded-lg bg-secondary p-2"><p className="text-xs text-muted-foreground">Counterfactual</p><p className="font-heading text-2xl font-bold">{Math.round(r.altered_score)}</p></div>
+              <div className={cn("rounded-lg p-2", fair ? "bg-matched/15 text-matched" : "bg-missing/15 text-missing")}>
+                <p className="text-xs">Difference</p><p className="font-heading text-2xl font-bold">{r.difference > 0 ? "+" : ""}{r.difference}</p>
+              </div>
+            </div>
+            <p className={cn("flex items-center gap-1.5 font-medium", fair ? "text-matched" : "text-missing")}>
+              <ShieldCheck className="h-4 w-4" />
+              {fair ? "Score unchanged: protected attributes don't influence the result." : "Scores differ beyond model noise; review manually."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Model input after stripping was {r.inputs_identical ? <b className="text-matched">byte-for-byte identical</b> : <b className="text-missing">different</b>} for both versions
+              {r.inputs_identical && Math.abs(r.difference) > 0 ? " — any difference is model randomness, not the attributes" : ""}.
+            </p>
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer text-primary">Changed: {r.attributes_changed.join(", ")}</summary>
+              <p className="mt-1.5">Counterfactual: {r.altered_preview.name} · {r.altered_preview.email} · {r.altered_preview.location}</p>
+              <p className="mt-1 font-mono">{r.altered_preview.summary}</p>
+            </details>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

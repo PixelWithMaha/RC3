@@ -2,6 +2,7 @@
 // AI work always goes through app/api/* routes; nothing here touches AI keys.
 import { createClient } from "@/lib/supabase/client";
 import type {
+  Profile,
   ApplicationEvent, ApplicationStatus, CandidateInterview, ConflictCheckResponse, Difficulty, Interview,
   InterviewFeedback, InterviewQuestion, InterviewType, Job, SearchResult, JobExtraction, JobStatus, JobWithCounts,
   MatchResponse, Notification, ParseResumeResponse, ParsedResume, RankedApplication, RecruiterNote, Resume,
@@ -44,19 +45,19 @@ export async function getMyResume(): Promise<Resume | null> {
  * parse_status 'failed' | 'empty' and an error message — call parseResume(id) to retry.
  */
 export async function uploadResume(file: File): Promise<{ resumeId: string } & ParseResumeResponse> {
-  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
-    throw new Error("Unsupported file type. Please upload a PDF resume.");
-  }
+  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const ext = /\.docx$/i.test(file.name) || file.type === DOCX ? "docx" : /\.pdf$/i.test(file.name) || file.type === "application/pdf" ? "pdf" : null;
+  if (!ext) throw new Error("Unsupported file type. Please upload a PDF or DOCX resume.");
   if (file.size > 5 * 1024 * 1024) throw new Error("File too large. Maximum size is 5 MB.");
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
 
-  const path = `${user.id}/${crypto.randomUUID()}.pdf`;
+  const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await supabase.storage
     .from("resumes")
-    .upload(path, file, { contentType: "application/pdf", upsert: false });
+    .upload(path, file, { contentType: ext === "pdf" ? "application/pdf" : DOCX, upsert: false });
   if (upErr) throw new Error("Upload failed: " + upErr.message);
 
   const { data: row, error: insErr } = await supabase
@@ -482,4 +483,60 @@ export async function getRecruiterDashboard() {
   const rows = (apps.data ?? []) as RankedApplication[];
   const ev = (events.data ?? []) as Pick<ApplicationEvent, "application_id" | "to_status" | "created_at" | "event_type">[];
   return { jobs, apps: rows, events: ev, interviews, analytics: computeAnalytics(jobs, rows, ev, interviews) };
+}
+
+// ---------------------------------------------------------------- P2: fairness, recommendations, duplicates, profile
+export type { FairnessTestResponse } from "@/app/api/fairness-test/route";
+import type { FairnessTestResponse } from "@/app/api/fairness-test/route";
+
+/** TI-7: counterfactual test — protected attributes changed, both versions re-scored. */
+export async function runFairnessTest(applicationId: string): Promise<FairnessTestResponse> {
+  return postJSON<FairnessTestResponse>("/api/fairness-test", { applicationId });
+}
+
+export interface JobRecommendation { job: Job; score: number; reason: string; matched: string[]; missing: string[] }
+
+/** TI-4: open jobs ranked for the signed-in candidate (excludes jobs already applied to). */
+export async function getRecommendations(): Promise<{ jobs: JobRecommendation[]; needsResume?: boolean }> {
+  const res = await fetch("/api/recommendations");
+  const data = await res.json().catch(() => ({ error: "Unexpected server response" }));
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data;
+}
+
+export type { DuplicatePair } from "@/app/api/duplicates/route";
+import type { DuplicatePair } from "@/app/api/duplicates/route";
+
+/** TI-3: detect possible duplicate applicants (stored as pending flags). */
+export async function getDuplicates(): Promise<DuplicatePair[]> {
+  const res = await fetch("/api/duplicates");
+  const data = await res.json().catch(() => ({ error: "Unexpected server response" }));
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data.pairs;
+}
+
+/** Recruiter confirms (merge = close the later application) or dismisses a flag. */
+export async function resolveDuplicate(flagId: string, action: "merge" | "dismiss"): Promise<void> {
+  await postJSON("/api/duplicates", { flagId, action });
+}
+
+// ---------------------------------------------------------------- Profile
+export async function getMyProfile(): Promise<Profile> {
+  const userId = await requireUserId();
+  const { data, error } = await createClient().from("profiles").select("*").eq("id", userId).single();
+  if (error || !data) throw new Error(error?.message ?? "Profile not found");
+  return data as Profile;
+}
+
+/** Name, phone and interests only — role can't be changed (DB trigger). */
+export async function updateMyProfile(patch: { full_name: string; phone: string | null; interests: string[] }): Promise<Profile> {
+  const full_name = patch.full_name.trim().slice(0, 120);
+  if (!full_name) throw new Error("Name is required");
+  const phone = patch.phone?.trim() || null;
+  if (phone && !/^[+()\d\s-]{7,20}$/.test(phone)) throw new Error("Phone number looks invalid");
+  const interests = [...new Set(patch.interests.map((i) => i.trim()).filter(Boolean))].slice(0, 20).map((i) => i.slice(0, 40));
+  const userId = await requireUserId();
+  const { data, error } = await createClient().from("profiles").update({ full_name, phone, interests }).eq("id", userId).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Could not save profile");
+  return data as Profile;
 }

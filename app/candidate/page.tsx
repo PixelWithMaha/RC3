@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarClock, FileText } from "lucide-react";
-import { getMyApplications, getMyInterviews, getMyResume } from "@/lib/api";
+import { ArrowRight, CalendarClock, FileText, Sparkles } from "lucide-react";
+import { getMyApplications, getMyInterviews, getMyResume, getRecommendations } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/app/badges";
@@ -77,6 +77,8 @@ export default function CandidateDashboard() {
         </Card>
       </div>
 
+      <Recommended />
+
       <h2 className="mb-3 mt-8 text-lg font-semibold">Recent applications</h2>
       {apps.length === 0 ? (
         <Empty title="No applications yet" action={<Button asChild><Link href="/candidate/jobs">Browse jobs <ArrowRight className="h-4 w-4" /></Link></Button>}>
@@ -93,5 +95,33 @@ export default function CandidateDashboard() {
         </div>
       )}
     </>
+  );
+}
+
+function Recommended() {
+  const { data, error, loading, reload } = useAsync(getRecommendations);
+  return (
+    <section className="mt-8">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Recommended for you</h2>
+      <p className="mb-3 text-sm text-muted-foreground">Ranked by your verified skills, project experience, interests and resume meaning.</p>
+      {loading && <Loading className="py-4" />}
+      {error && <ErrorState message={error} onRetry={reload} />}
+      {data?.needsResume && <Empty title="Upload your resume to get recommendations" action={<Button asChild size="sm"><Link href="/candidate/resume">Upload resume</Link></Button>} />}
+      {data && !data.needsResume && data.jobs.length === 0 && <Empty title="No new jobs to recommend">You&apos;ve applied to every open role. Check back soon.</Empty>}
+      <div className="grid gap-3 md:grid-cols-2">
+        {data?.jobs.map((r) => (
+          <Link key={r.job.id} href={`/candidate/jobs/${r.job.id}`} className="dash-card rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-heading font-semibold">{r.job.title}</p>
+                <p className="text-xs text-muted-foreground">{[r.job.location, r.job.type].filter(Boolean).join(" · ")}</p>
+              </div>
+              <span className="rounded-lg border border-matched/50 px-2 py-0.5 font-heading text-lg font-bold text-matched">{r.score}</span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{r.reason}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }

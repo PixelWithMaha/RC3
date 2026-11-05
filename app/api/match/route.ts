@@ -5,10 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, parseBody, requireUser } from "@/lib/api-server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateJSON } from "@/lib/ai/gemini";
-import { anonymizeResume } from "@/lib/ai/fairness";
-import { buildMatchResult } from "@/lib/ai/match";
-import { MATCH_JSON_SCHEMA, MATCH_SYSTEM, MatchZ, matchPrompt } from "@/lib/ai/prompts";
+import { runMatch } from "@/lib/ai/run-match";
 import type { Job, MatchResponse, ParsedResume } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -58,25 +55,10 @@ export async function POST(req: Request) {
     app.status = "parsed";
   }
 
-  // TI-7: only anonymized evidence reaches the model
-  const jobForModel = {
-    title: job.title,
-    description: job.description.slice(0, 6000),
-    required_skills: job.required_skills,
-    preferred_skills: job.preferred_skills,
-    min_experience_years: job.min_experience_years,
-    qualifications: job.qualifications,
-  };
-
+  // TI-7: only anonymized evidence reaches the model (see lib/ai/run-match.ts)
   let result;
   try {
-    const out = await generateJSON({
-      system: MATCH_SYSTEM,
-      prompt: matchPrompt(jobForModel, anonymizeResume(resume.parsed)),
-      jsonSchema: MATCH_JSON_SCHEMA,
-      zod: MatchZ,
-    });
-    result = buildMatchResult(job, out, resume.raw_text);
+    result = await runMatch(job, resume.parsed, resume.raw_text);
   } catch (err) {
     console.error("[match] AI failure", err);
     await admin.from("applications").update({ match_error: "AI scoring failed. Use re-score to retry." }).eq("id", app.id);

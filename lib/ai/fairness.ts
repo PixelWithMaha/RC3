@@ -36,13 +36,19 @@ export function scrubText(text: string, name?: string | null): string {
       t = t.replace(new RegExp(`\\b${escapeRegExp(part)}\\b`, "gi"), "[candidate]");
     }
   }
+  // Personal attributes are removed outright (a "[redacted]" marker would itself tell the model something).
   return t
-    .replace(LABELED, REDACT)
-    .replace(PERSONAL_PHRASES, REDACT)
-    .replace(AGE_PHRASE, REDACT)
+    .replace(LABELED, "")
+    .replace(PERSONAL_PHRASES, "")
+    .replace(AGE_PHRASE, "")
     .replace(PHONE, redactPhone)
     .replace(PRONOUN_TITLES, "")
-    .replace(GENDERED_WORDS, "they");
+    .replace(GENDERED_WORDS, "they")
+    .replace(/\s+([.,;|])/g, "$1") // tidy what the removals left behind
+    .replace(/([.,;|])(?:\s*[.,;|])+/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^[\s.,;|]+|[\s,;|]+$/g, "")
+    .trim();
 }
 
 export function anonymizeResume(p: ParsedResume): AnonymizedResume {

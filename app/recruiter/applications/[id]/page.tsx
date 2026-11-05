@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/app/badges";
 import { ErrorState, Loading, useAction, useAsync } from "@/components/app/states";
-import { AuditCard, EvidenceCard, InterviewsCard, NotesCard, QuestionsCard, ScoreCard, StatusActions } from "@/components/app/application-panels";
+import { AuditCard, EvidenceCard, FairnessCard, InterviewsCard, NotesCard, QuestionsCard, ScoreCard, StatusActions } from "@/components/app/application-panels";
 
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -61,6 +61,7 @@ export default function ApplicationDetail() {
           <ScoreCard app={app} rescoring={!!rescore.busy} onChanged={changed}
             onRescore={() => rescore.run("rescore", async () => { await rescoreApplication(app.id); changed(); })} />
           <EvidenceCard app={app} />
+          <FairnessCard applicationId={app.id} />
           <QuestionsCard applicationId={app.id} />
         </div>
         <div className="space-y-4">
