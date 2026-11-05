@@ -9,7 +9,8 @@
     "seed:pdfs": "node scripts/seed-demo.mjs pdfs",
     "seed:accounts": "node --env-file=.env.local scripts/seed-demo.mjs accounts",
     "seed:all": "node --env-file=.env.local scripts/seed-demo.mjs all",
-    "seed:reparse": "node --env-file=.env.local scripts/seed-demo.mjs reparse"
+    "seed:reparse": "node --env-file=.env.local scripts/seed-demo.mjs reparse",
+    "seed:set-password": "node --env-file=.env.local scripts/seed-demo.mjs set-password"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",

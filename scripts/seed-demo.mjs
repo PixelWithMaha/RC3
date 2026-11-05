@@ -211,7 +211,7 @@ function env() {
     secret: process.env.SUPABASE_SECRET_KEY, password: process.env.DEMO_PASSWORD,
     base: (process.env.SEED_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
   };
-  if (!e.password || e.password.length < 8) throw new Error("Set DEMO_PASSWORD (min 8 chars)");
+  if (!e.password || e.password.length < 6) throw new Error("Set DEMO_PASSWORD (min 6 chars, Supabase minimum)");
   if (!e.url || !e.anon || !e.secret) throw new Error("Run with --env-file=.env.local (needs Supabase URL, publishable and secret keys)");
   return e;
 }
@@ -352,6 +352,21 @@ async function reparse() {
   }
 }
 
+/** Set the same password on every demo account (admin API). Usage: NEW_PASSWORD=... npm run seed:set-password */
+async function setPassword() {
+  const pw = process.env.NEW_PASSWORD;
+  if (!pw || pw.length < 6) throw new Error("Set NEW_PASSWORD (min 6 chars, Supabase minimum)");
+  const { createClient } = await import("@supabase/supabase-js");
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
+  const emails = new Set([...RECRUITERS, ...CANDIDATES].map((a) => a.email));
+  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (error) throw new Error(error.message);
+  for (const u of data.users.filter((u) => emails.has(u.email ?? ""))) {
+    const r = await admin.auth.admin.updateUserById(u.id, { password: pw });
+    console.log(r.error ? `• ${u.email}: ${r.error.message}` : `✓ ${u.email}`);
+  }
+}
+
 const cmd = process.argv[2];
 if (cmd === "pdfs") {
   for (const [name, lines] of Object.entries(RESUMES)) {
@@ -364,6 +379,8 @@ if (cmd === "pdfs") {
   await all();
 } else if (cmd === "reparse") {
   await reparse();
+} else if (cmd === "set-password") {
+  await setPassword();
 } else {
-  console.log("Usage: node scripts/seed-demo.mjs pdfs | accounts | all | reparse");
+  console.log("Usage: node scripts/seed-demo.mjs pdfs | accounts | all | reparse | set-password");
 }
