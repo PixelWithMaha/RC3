@@ -3,10 +3,12 @@ import { GoogleGenAI } from "@google/genai";
 import type { z } from "zod";
 import { EMBEDDING_DIM } from "@/lib/types";
 
-// gemini-2.5-flash is closed to new API keys. The retry goes to a different model so a
-// demand spike (503) on one model doesn't break the demo.
+// gemini-2.5-flash is closed to new API keys. Retries walk a chain of models so a demand
+// spike (503/429) on one model doesn't break the demo.
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 export const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.8-flash";
+const MODEL_CHAIN = [...new Set([GEMINI_MODEL, GEMINI_FALLBACK_MODEL, "gemini-flash-latest", "gemini-3.5-flash-lite"])];
+const TOTAL_BUDGET_MS = 50_000; // stays under route maxDuration (60s)
 export const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 
 let client: GoogleGenAI | null = null;
@@ -26,8 +28,9 @@ export class AIError extends Error {
 }
 
 /**
- * Structured JSON generation. Validates with zod; on timeout / invalid JSON / schema
- * mismatch it retries once, then throws AIError (PRD §7 failure handling).
+ * Structured JSON generation. Validates with zod; on overload / timeout / invalid JSON it
+ * retries on the next model in the chain (short backoff) within a total time budget,
+ * then throws AIError (PRD §7 failure handling).
  */
 export async function generateJSON<T>(opts: {
   system: string;
@@ -38,11 +41,15 @@ export async function generateJSON<T>(opts: {
   timeoutMs?: number;
 }): Promise<T> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  for (let attempt = 0; attempt < MODEL_CHAIN.length; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 3_000) break;
+    if (attempt > 0) await new Promise((r) => setTimeout(r, Math.min(400 * attempt, remaining / 4)));
     try {
       const res = await withTimeout(
         ai().models.generateContent({
-          model: attempt === 0 ? GEMINI_MODEL : GEMINI_FALLBACK_MODEL,
+          model: MODEL_CHAIN[attempt],
           contents: opts.prompt,
           config: {
             systemInstruction: opts.system,
@@ -51,7 +58,7 @@ export async function generateJSON<T>(opts: {
             temperature: opts.temperature ?? 0.1,
           },
         }),
-        opts.timeoutMs ?? 60_000,
+        Math.min(opts.timeoutMs ?? 30_000, deadline - Date.now()),
       );
       const text = res.text;
       if (!text) throw new Error("Empty response from model");
@@ -61,9 +68,10 @@ export async function generateJSON<T>(opts: {
     } catch (err) {
       lastErr = err;
       if (err instanceof AIError) throw err; // config errors: don't retry
+      console.warn(`[gemini] ${MODEL_CHAIN[attempt]} failed: ${errMsg(err).slice(0, 160)}`);
     }
   }
-  throw new AIError(`AI request failed after retry: ${errMsg(lastErr)}`);
+  throw new AIError(`AI request failed after retries: ${errMsg(lastErr)}`);
 }
 
 export type EmbedTask = "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY" | "SEMANTIC_SIMILARITY";
