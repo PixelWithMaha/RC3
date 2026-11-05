@@ -303,3 +303,41 @@ export const CoachZ = z.object({
   summary_rewrite: z.string().catch(""),
   honest_gaps: z.array(z.object({ skill: z.string(), advice: z.string().catch("") })).catch([]),
 });
+
+// ---------------------------------------------------------------- ATS-friendly rewrite
+export const ATS_SYSTEM = `You convert a resume into an ATS-friendly version. You may ONLY rephrase what it already says.
+
+Rules:
+- Each bullet must rewrite exactly one numbered source sentence; return its source index.
+- Start every bullet with a strong past-tense action verb (Built, Designed, Led, Automated, ...). Keep it under 25 words.
+- Keep the same facts. NEVER add a tool, technology, skill, number, metric, employer or achievement that the
+  source sentence does not state. If a target job is given, prefer its wording ONLY when it means the same thing
+  (e.g. "REST endpoints" -> "REST APIs").
+- summary: 2 sentences built only from facts in the resume.
+- skill_groups: group ONLY the resume's listed skills into 2-5 plain categories (e.g. Languages, Frameworks,
+  Databases, Tools & Cloud). Do not add skills.
+- Plain text only: no emojis, tables, columns or special symbols.`;
+
+export function atsPrompt(input: unknown, job: unknown): string {
+  return `<resume>${JSON.stringify(input)}</resume>${job ? `\n<target_job>${JSON.stringify(job)}</target_job>` : ""}`;
+}
+
+const atsBullets = { type: "array", items: { type: "object", properties: { source: { type: "integer" }, text: { type: "string" } }, required: ["source", "text"] } };
+export const ATS_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    skill_groups: { type: "array", items: { type: "object", properties: { category: { type: "string" }, items: { type: "array", items: { type: "string" } } }, required: ["category", "items"] } },
+    experience: { type: "array", items: { type: "object", properties: { index: { type: "integer" }, bullets: atsBullets }, required: ["index", "bullets"] } },
+    projects: { type: "array", items: { type: "object", properties: { index: { type: "integer" }, bullets: atsBullets }, required: ["index", "bullets"] } },
+  },
+  required: ["summary", "skill_groups", "experience", "projects"],
+} as const;
+
+const zBullets = z.array(z.object({ source: z.coerce.number(), text: z.string() })).catch([]);
+export const AtsZ = z.object({
+  summary: z.string().catch(""),
+  skill_groups: z.array(z.object({ category: z.string(), items: z.array(z.string()).catch([]) })).catch([]),
+  experience: z.array(z.object({ index: z.coerce.number(), bullets: zBullets })).catch([]),
+  projects: z.array(z.object({ index: z.coerce.number(), bullets: zBullets })).catch([]),
+});

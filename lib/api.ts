@@ -555,3 +555,11 @@ import type { CoachResponse } from "@/app/api/resume/coach/route";
 export async function getResumeCoaching(jobId: string): Promise<CoachResponse> {
   return postJSON<CoachResponse>("/api/resume/coach", { jobId });
 }
+
+export type { AtsResponse } from "@/app/api/resume/ats/route";
+import type { AtsResponse } from "@/app/api/resume/ats/route";
+
+/** ATS-friendly version of the candidate's own resume (optionally aligned to a job's wording). */
+export async function makeAtsResume(jobId?: string): Promise<AtsResponse> {
+  return postJSON<AtsResponse>("/api/resume/ats", jobId ? { jobId } : {});
+}

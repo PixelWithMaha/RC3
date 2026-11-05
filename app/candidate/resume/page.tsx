@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { Check, FileText, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, FileText, Plus, Trash2, Upload, Wand2, X } from "lucide-react";
 import { getMyResume, parseResume, saveParsedResume, uploadResume } from "@/lib/api";
 import { GROUP_ORDER, assessSkill, findSkillSpans, mentions, resumeSources, skillGroup, type SkillEvidence, type Tier } from "@/lib/ai/evidence";
 import { normalizeSkill, sameSkill } from "@/lib/ai/normalize";
@@ -79,6 +80,9 @@ export default function ResumePage() {
             </span>
           )}
           <input ref={fileRef} type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+          {resume?.parse_status === "success" && (
+            <Button asChild variant="outline"><Link href="/candidate/ats"><Wand2 className="h-4 w-4" /> Make ATS-friendly</Link></Button>
+          )}
           <Button disabled={phase === "busy"} onClick={() => fileRef.current?.click()}>
             <Upload className="h-4 w-4" /> {resume ? "Upload new resume" : "Upload PDF or DOCX"}
           </Button>

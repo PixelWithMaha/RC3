@@ -116,3 +116,12 @@
 @keyframes auth-drift { to { transform: translate(-60px, 50px) scale(1.15); } }
 .auth-aurora { animation: auth-drift 14s ease-in-out infinite alternate; }
 @media (prefers-reduced-motion: reduce) { .auth-aurora { animation: none; } }
+
+/* ---------- ATS resume: print only the document, as plain black-on-white text ---------- */
+@media print {
+  @page { margin: 14mm; }
+  html, body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  #ats-doc, #ats-doc * { visibility: visible !important; }
+  #ats-doc { position: absolute; inset: 0 auto auto 0; width: 100%; margin: 0; padding: 0 !important; border: 0 !important; box-shadow: none !important; }
+}
