@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCounterfactual, cosine, findDuplicatePairs, normEmail, normPhone, parseVector, recommendJobs } from "@/lib/talent";
+import { buildCounterfactual, cosine, documentSimilarity, findDuplicatePairs, normEmail, normPhone, parseVector, recommendJobs, type DupCandidate } from "@/lib/talent";
 import { anonymizeResume } from "@/lib/ai/fairness";
 import type { Job, ParsedResume } from "@/lib/types";
 
@@ -60,23 +60,38 @@ describe("recommendations (TI-4)", () => {
 });
 
 describe("duplicates (TI-3)", () => {
-  const row = (id: string, cand: string, email: string | null, phone: string | null, embedding?: string) =>
-    ({ application_id: id, candidate_id: cand, job_id: "j", created_at: `2026-11-0${id}`, email, phone, embedding });
+  const resumeA = "Ayesha Khan backend engineer with 5 years building Python web services. Built REST APIs in Django and PostgreSQL serving 80k daily users. Containerized every service with Docker.";
+  const resumeB = "Hamza Tariq backend developer with 4 years of experience. Designed Django services on Postgres and deployed them with Docker on AWS for a fintech startup.";
+  const row = (id: string, cand: string, o: Partial<DupCandidate> = {}): DupCandidate =>
+    ({ application_id: id, candidate_id: cand, job_id: "j1", created_at: `2026-11-0${id}`, email: null, phone: null, raw_text: resumeB, ...o });
+
   it("normalizes email and phone", () => {
     expect(normEmail(" Sara+jobs@Example.com ")).toBe("sara@example.com");
     expect(normPhone("+92 (300) 111-0001")).toBe(normPhone("0300 1110001"));
   });
-  it("flags same email/phone or near-identical resumes across different accounts", () => {
+  it("document similarity separates a copy from a different person's resume", () => {
+    expect(documentSimilarity(resumeA, resumeA)).toBe(1);
+    expect(documentSimilarity(resumeA, resumeB)!).toBeLessThan(0.2);
+  });
+  it("flags strong signals only, never embedding similarity alone", () => {
     const pairs = findDuplicatePairs([
-      row("1", "c1", "sara@x.com", null), row("2", "c2", "SARA@x.com", null),
-      row("3", "c3", null, "0300 1234567"), row("4", "c4", null, "+92 300 1234567"),
-      row("5", "c5", null, null, "[1,0,0]"), row("6", "c6", null, null, "[0.999,0.01,0]"),
-      row("7", "c1", "sara@x.com", null),
+      row("1", "c1", { email: "sara@x.com" }), row("2", "c2", { email: "SARA@x.com" }),
+      row("3", "c3", { phone: "0300 1234567", raw_text: resumeA }), row("4", "c4", { phone: "+92 300 1234567", raw_text: "x" }),
+      row("5", "c5", { raw_text: resumeA, embedding: "[1,0]" }), row("6", "c6", { raw_text: resumeA + " Also mentors juniors.", embedding: "[1,0]" }),
+      row("7", "c7", { raw_text: "unrelated text about frontend react work", embedding: "[1,0]" }),
     ]);
     const ids = pairs.map((p) => `${p.a.application_id}-${p.b.application_id}`);
-    expect(ids).toContain("1-2");
-    expect(ids).toContain("3-4");
-    expect(ids).toContain("5-6");
-    expect(ids).not.toContain("1-7"); // same account
+    expect(ids).toEqual(expect.arrayContaining(["1-2", "3-4", "5-6"]));
+    expect(ids.some((x) => x.includes("7"))).toBe(false); // identical embedding, different document → not flagged
+    expect(pairs.find((p) => p.a.application_id === "5")!.reasons[0]).toMatch(/identical/);
+  });
+  it("keeps one pair per pair of accounts, preferring the same job", () => {
+    const pairs = findDuplicatePairs([
+      row("1", "c1", { email: "a@x.com", job_id: "j1" }), row("2", "c1", { email: "a@x.com", job_id: "j2" }),
+      row("3", "c2", { email: "a@x.com", job_id: "j2" }),
+    ]);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]).toMatchObject({ sameJob: true });
+    expect([pairs[0].a.application_id, pairs[0].b.application_id].sort()).toEqual(["2", "3"]);
   });
 });

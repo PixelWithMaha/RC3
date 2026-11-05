@@ -21,7 +21,7 @@ export default function Duplicates() {
       <Hero
         eyebrow="Data quality"
         title="Duplicate applications"
-        description="The same person under different accounts: matching resume email or phone, or near-identical resumes. Nothing changes until you confirm."
+        description="The same person under different accounts: matching resume email or phone, or a near-identical resume document. Nothing changes until you confirm."
         actions={<Button variant="outline" onClick={reload} disabled={loading}>Re-scan</Button>}
         art="shield"
       />
@@ -33,7 +33,7 @@ export default function Duplicates() {
         {pending.map((p, i) => (
           <Pair key={p.flag_id} p={p} i={i}>
             <Button size="sm" disabled={!!action.busy} onClick={() => action.run(p.flag_id, async () => { await resolveDuplicate(p.flag_id, "merge"); await reload(); })}>
-              Confirm duplicate
+              {p.same_job ? "Confirm & close later application" : "Confirm same person"}
             </Button>
             <Button size="sm" variant="outline" disabled={!!action.busy} onClick={() => action.run(p.flag_id, async () => { await resolveDuplicate(p.flag_id, "dismiss"); await reload(); })}>
               Not a duplicate
@@ -45,7 +45,7 @@ export default function Duplicates() {
         <>
           <h2 className="mb-3 mt-8 text-lg font-semibold">Resolved</h2>
           <div className="space-y-3 opacity-75">
-            {resolved.map((p) => <Pair key={p.flag_id} p={p}><span className="text-sm text-muted-foreground">{p.status === "merged" ? "Confirmed — later application closed" : "Dismissed"}</span></Pair>)}
+            {resolved.map((p) => <Pair key={p.flag_id} p={p}><span className="text-sm text-muted-foreground">{p.status === "merged" ? (p.same_job ? "Confirmed: later application closed" : "Confirmed: same person, records linked") : "Dismissed"}</span></Pair>)}
           </div>
         </>
       )}
@@ -57,7 +57,15 @@ function Pair({ p, children, i = 0 }: { p: DuplicatePair; children: React.ReactN
   return (
     <div style={stagger(i)} className="dash-card rounded-2xl border border-border bg-surface p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-sm font-medium text-missing"><Copy className="h-4 w-4" /> {p.reason}</span>
+        <div className="space-y-1">
+          <div className="flex flex-wrap gap-1.5">
+            {p.reason.split(" · ").filter(Boolean).map((r) => (
+              <span key={r} className="inline-flex items-center gap-1 rounded-full border border-missing/50 bg-missing/10 px-2.5 py-0.5 text-xs font-medium text-missing"><Copy className="h-3 w-3" /> {r}</span>
+            ))}
+          </div>
+          {p.context.length > 0 && <p className="text-xs text-muted-foreground">{p.context.join(" · ")}</p>}
+          <p className="text-xs text-muted-foreground">{p.same_job ? "Both applied to the same job." : "Applications to different jobs: confirming links the records and rejects nobody."}</p>
+        </div>
         <div className="flex gap-2">{children}</div>
       </div>
       <div className="grid gap-3 md:grid-cols-2">

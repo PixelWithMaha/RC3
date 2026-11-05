@@ -86,30 +86,71 @@ export function recommendJobs(
 export interface DupCandidate {
   application_id: string; candidate_id: string; job_id: string; created_at: string;
   email: string | null; phone: string | null; embedding?: unknown;
+  raw_text?: string | null; name?: string | null;
 }
-export interface DupPair { a: DupCandidate; b: DupCandidate; similarity: number | null; reasons: string[] }
+export interface DupPair {
+  a: DupCandidate; b: DupCandidate;
+  similarity: number | null;   // document (text) similarity 0-1
+  meaning: number | null;      // embedding cosine — context only, never sufficient alone
+  reasons: string[];           // strong signals that triggered the flag
+  context: string[];           // supporting information shown to the recruiter
+  sameJob: boolean;
+}
 
 export const normEmail = (e: string | null | undefined) => (e ? e.trim().toLowerCase().replace(/\+[^@]*@/, "@") : null);
 export const normPhone = (p: string | null | undefined) => { const d = (p ?? "").replace(/\D/g, ""); return d.length >= 9 ? d.slice(-10) : null; };
+const normName = (n: string | null | undefined) => (n ?? "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ") || null;
 
-/** Same person applying under different accounts: matching email/phone, or near-identical resume embeddings. */
-export function findDuplicatePairs(rows: DupCandidate[], threshold = 0.97): DupPair[] {
-  const out: DupPair[] = [];
+/** Lexical near-duplicate check: Jaccard overlap of word 3-grams. Same document ≈ 1, different people ≈ low. */
+export function documentSimilarity(a: string | null | undefined, b: string | null | undefined): number | null {
+  const grams = (t: string) => {
+    const w = t.toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim().split(" ").filter(Boolean);
+    const g = new Set<string>();
+    for (let i = 0; i + 2 < w.length; i++) g.add(`${w[i]} ${w[i + 1]} ${w[i + 2]}`);
+    return g;
+  };
+  if (!a || !b) return null;
+  const ga = grams(a), gb = grams(b);
+  if (!ga.size || !gb.size) return null;
+  let inter = 0;
+  for (const g of ga) if (gb.has(g)) inter++;
+  return inter / (ga.size + gb.size - inter);
+}
+
+export const DOC_THRESHOLD = 0.6;
+
+/**
+ * Likely duplicate CANDIDATE records (different accounts, same person).
+ * Strong signals only: same normalized email, same normalized phone, or a near-identical resume document.
+ * Embedding similarity and matching names are shown as context but never flag on their own
+ * (two backend developers' resumes are semantically ~0.98 similar without being the same person).
+ * One pair per pair of accounts; a same-job application pair is preferred as the representative.
+ */
+export function findDuplicatePairs(rows: DupCandidate[]): DupPair[] {
+  const best = new Map<string, DupPair>();
   for (let i = 0; i < rows.length; i++) {
     for (let j = i + 1; j < rows.length; j++) {
       const a = rows[i], b = rows[j];
-      if (a.candidate_id === b.candidate_id) continue; // same account: already one application per job
+      if (a.candidate_id === b.candidate_id) continue;
       const reasons: string[] = [];
-      if (normEmail(a.email) && normEmail(a.email) === normEmail(b.email)) reasons.push("same email");
-      if (normPhone(a.phone) && normPhone(a.phone) === normPhone(b.phone)) reasons.push("same phone");
+      if (normEmail(a.email) && normEmail(a.email) === normEmail(b.email)) reasons.push("Same email in resume");
+      if (normPhone(a.phone) && normPhone(a.phone) === normPhone(b.phone)) reasons.push("Same phone in resume");
+      const doc = documentSimilarity(a.raw_text, b.raw_text);
+      if (doc != null && doc >= DOC_THRESHOLD) reasons.push(`Resume text ${Math.round(doc * 100)}% identical`);
+      if (!reasons.length) continue;
       const va = parseVector(a.embedding), vb = parseVector(b.embedding);
-      const sim = va && vb ? cosine(va, vb) : null;
-      if (sim != null && sim >= threshold) reasons.push(`resume ${(sim * 100).toFixed(1)}% similar`);
-      if (reasons.length) {
-        const [first, second] = a.created_at <= b.created_at ? [a, b] : [b, a];
-        out.push({ a: first, b: second, similarity: sim, reasons });
-      }
+      const meaning = va && vb ? cosine(va, vb) : null;
+      const context: string[] = [];
+      if (doc != null && doc < DOC_THRESHOLD) context.push(`Resume text ${Math.round(doc * 100)}% identical`);
+      if (meaning != null) context.push(`Meaning ${Math.round(meaning * 100)}% similar`);
+      const na = normName(a.name), nb = normName(b.name);
+      if (na && nb) context.push(na === nb ? "Same account name" : `Different account names: “${a.name}” vs “${b.name}”`);
+      const [first, second] = a.created_at <= b.created_at ? [a, b] : [b, a];
+      const pair: DupPair = { a: first, b: second, similarity: doc, meaning, reasons, context, sameJob: a.job_id === b.job_id };
+      const key = [a.candidate_id, b.candidate_id].sort().join("|");
+      const prev = best.get(key);
+      if (!prev || (pair.sameJob && !prev.sameJob) || (pair.sameJob === prev.sameJob && pair.b.created_at < prev.b.created_at)) best.set(key, pair);
     }
   }
-  return out;
+  return [...best.values()];
 }
