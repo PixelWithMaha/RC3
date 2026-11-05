@@ -547,3 +547,11 @@ export async function updateMyProfile(patch: { full_name: string; phone: string 
   if (error || !data) throw new Error(error?.message ?? "Could not save profile");
   return data as Profile;
 }
+
+export type { CoachResponse } from "@/app/api/resume/coach/route";
+import type { CoachResponse } from "@/app/api/resume/coach/route";
+
+/** Resume coach: verified rewrite suggestions that tailor the candidate's own resume lines to a job. */
+export async function getResumeCoaching(jobId: string): Promise<CoachResponse> {
+  return postJSON<CoachResponse>("/api/resume/coach", { jobId });
+}

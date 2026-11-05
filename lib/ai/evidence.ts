@@ -68,7 +68,8 @@ const GROUPS: Record<string, string[]> = {
   "DevOps & cloud": ["Docker", "Docker Compose", "Kubernetes", "AWS", "Google Cloud", "Azure", "CI/CD", "GitHub Actions", "Git", "GitHub", "Linux", "Terraform"],
 };
 export const GROUP_ORDER = [...Object.keys(GROUPS), "Other"];
-const KNOWN = Object.values(GROUPS).flat();
+export const KNOWN_SKILLS = Object.values(GROUPS).flat();
+const KNOWN = KNOWN_SKILLS;
 function isKnownSkill(phrase: string): boolean {
   return normalizeSkill(phrase) !== phrase.trim() || KNOWN.some((k) => sameSkill(k, phrase));
 }

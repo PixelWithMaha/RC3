@@ -21,6 +21,7 @@ const NAV: Record<Role, { href: string; label: string }[]> = {
   candidate: [
     { href: "/candidate", label: "Dashboard" },
     { href: "/candidate/resume", label: "Resume" },
+    { href: "/candidate/coach", label: "Coach" },
     { href: "/candidate/jobs", label: "Jobs" },
     { href: "/candidate/applications", label: "Applications" },
     { href: "/candidate/profile", label: "Profile" },

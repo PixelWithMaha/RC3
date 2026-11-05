@@ -243,3 +243,63 @@ export const QuestionsZ = z.object({
     answer_guideline: z.string().catch(""),
   })).min(1),
 });
+
+// ---------------------------------------------------------------- Resume coach (tailor to a job)
+export const COACH_SYSTEM = `You are an honest resume coach. A candidate wants to tailor their resume to one job.
+You may ONLY rephrase what their resume already says, so it reads clearly in the job's vocabulary.
+
+Hard rules:
+- "original" MUST be copied VERBATIM from the resume lines provided (one bullet/sentence).
+- The rewrite must keep the same facts. NEVER add a tool, technology, skill, employer, title, number,
+  percentage, metric or achievement that the original line does not state. Do not inflate seniority.
+- You MAY: use the job's term for the same thing (e.g. "REST endpoints" -> "REST APIs", "Postgres" -> "PostgreSQL"),
+  lead with a strong verb, make the impact clearer, move the most job-relevant fact first.
+- target_skills: the job skills this rewrite makes clearer (only ones the original line genuinely shows).
+- Suggest at most 6 rewrites, most impactful first. Skip lines that are already strong.
+- summary_rewrite: a 2-sentence professional summary built ONLY from facts in the resume, aimed at this job.
+- honest_gaps: job skills the resume shows NO evidence for. For each, practical advice to genuinely gain or
+  demonstrate it (a small project, a course, a certification). Never suggest claiming it.`;
+
+export function coachPrompt(job: unknown, lines: unknown, skills: string[]): string {
+  return `<job>${JSON.stringify(job)}</job>
+<resume_lines>${JSON.stringify(lines)}</resume_lines>
+<resume_skills>${JSON.stringify(skills)}</resume_skills>`;
+}
+
+export const COACH_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          section: { type: "string", enum: ["experience", "project", "summary", "skills"] },
+          original: { type: "string" },
+          rewrite: { type: "string" },
+          target_skills: { type: "array", items: { type: "string" } },
+          why: { type: "string" },
+        },
+        required: ["section", "original", "rewrite", "target_skills", "why"],
+      },
+    },
+    summary_rewrite: { type: "string" },
+    honest_gaps: {
+      type: "array",
+      items: { type: "object", properties: { skill: { type: "string" }, advice: { type: "string" } }, required: ["skill", "advice"] },
+    },
+  },
+  required: ["suggestions", "summary_rewrite", "honest_gaps"],
+} as const;
+
+export const CoachZ = z.object({
+  suggestions: z.array(z.object({
+    section: z.enum(["experience", "project", "summary", "skills"]).catch("experience"),
+    original: z.string(),
+    rewrite: z.string().min(3),
+    target_skills: z.array(z.string()).catch([]),
+    why: z.string().catch(""),
+  })).catch([]),
+  summary_rewrite: z.string().catch(""),
+  honest_gaps: z.array(z.object({ skill: z.string(), advice: z.string().catch("") })).catch([]),
+});

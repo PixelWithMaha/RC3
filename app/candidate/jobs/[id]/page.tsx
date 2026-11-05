@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, MapPin, Wallet } from "lucide-react";
+import { ArrowLeft, CheckCircle2, MapPin, Wallet, Wand2 } from "lucide-react";
 import { applyToJob, getJob, getMyApplications, getMyResume } from "@/lib/api";
 import { assessSkill, findSkillSpans, resumeSources } from "@/lib/ai/evidence";
 import type { Job, Resume, SkillRequirement } from "@/lib/types";
@@ -80,6 +80,11 @@ export default function JobDetail() {
                 {action.busy ? "Submitting & assessing…" : "Apply now"}
               </Button>
             </>
+          )}
+          {canApply && (
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link href={`/candidate/coach?job=${job.id}`}><Wand2 className="h-4 w-4" /> Tailor my resume for this job</Link>
+            </Button>
           )}
           {note && <p className="text-xs text-muted-foreground">{note}</p>}
           {action.error && <ErrorState message={action.error} />}
