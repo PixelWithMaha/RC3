@@ -17,7 +17,16 @@ export default function CandidateDashboard() {
   if (loading) return <Loading />;
   if (error || !data) return <ErrorState message={error ?? "Could not load"} onRetry={reload} />;
   const { resume, apps, interviews } = data;
-  const upcoming = interviews.filter((i) => i.status === "scheduled" && new Date(i.scheduled_at) > new Date());
+  // Upcoming first (soonest), then past/completed (most recent). Cancelled ones are hidden.
+  const now = Date.now();
+  const shown = interviews
+    .filter((i) => i.status !== "cancelled")
+    .sort((a, b) => {
+      const ta = new Date(a.scheduled_at).getTime(), tb = new Date(b.scheduled_at).getTime();
+      const ua = a.status === "scheduled" && ta >= now, ub = b.status === "scheduled" && tb >= now;
+      return ua !== ub ? (ua ? -1 : 1) : ua ? ta - tb : tb - ta;
+    })
+    .slice(0, 3);
 
   return (
     <>
@@ -47,12 +56,23 @@ export default function CandidateDashboard() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> Upcoming interviews</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            {upcoming.length === 0 && <p className="text-muted-foreground">None scheduled.</p>}
-            {upcoming.map((i) => (
-              <p key={i.id}>{i.job_title} · {new Date(i.scheduled_at).toLocaleString()}</p>
-            ))}
+          <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> Interviews</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {shown.length === 0 && <p className="text-muted-foreground">None scheduled yet.</p>}
+            {shown.map((i) => {
+              const upcoming = i.status === "scheduled" && new Date(i.scheduled_at).getTime() >= now;
+              return (
+                <div key={i.id} className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{i.job_title}</p>
+                    <p className="text-xs text-muted-foreground">{i.type} · {new Date(i.scheduled_at).toLocaleString()} · {i.duration_min} min</p>
+                  </div>
+                  <span className={upcoming ? "rounded-full bg-matched/15 px-2 py-0.5 text-xs text-matched" : "rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground"}>
+                    {upcoming ? "Upcoming" : i.status === "done" ? "Completed" : "Past"}
+                  </span>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>
