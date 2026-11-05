@@ -45,15 +45,24 @@ cp .env.example .env.local      # fill in Supabase + Gemini keys
 Vercel: set the same four env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `GEMINI_API_KEY`).
 
 ## Demo data
+One command seeds everything through the **real** app routes (Gemini parses and scores; nothing is hardcoded):
 ```bash
-npm run seed:pdfs                                   # writes public/demo/*.pdf
-DEMO_PASSWORD='choose-one' npm run seed:accounts    # recruiter@rc3.demo + ayesha@, bilal@, hina@rc3.demo
+npm run dev                                         # in another terminal (or set SEED_BASE_URL to your Vercel URL)
+DEMO_PASSWORD='choose-one' npm run seed:all
 ```
+It creates (re-runnable, existing rows are reused):
+- **Recruiters:** `recruiter@rc3.demo` (Backend Developer, Data Analyst) · `talent@rc3.demo` (Frontend Developer, DevOps Engineer)
+- **Candidates** with parsed PDF resumes from `public/demo/`: ayesha, bilal, hina, zara, omar, usman `@rc3.demo`
+- **9 applications**, each AI-scored; on the non-demo jobs a few recruiter actions (shortlists, one rejection, one scheduled interview)
+- The **Backend Developer** job keeps the official trio (strong / partial / weak) at *AI assessed*, ready for the live demo
+
 | Resume | Expected result for "Backend Developer (Python, Django, PostgreSQL, Docker)" |
 |---|---|
 | `strong-ayesha-khan.pdf` | All four matched with excerpts |
 | `partial-bilal-ahmed.pdf` | Python matched, Flask/MySQL partial, Docker **missing evidence** |
 | `weak-hina-raza.pdf` | Frontend only, "No backend experience" → **confirmed absence** |
+
+Other commands: `npm run seed:pdfs` (regenerate PDFs), `npm run seed:accounts` (accounts only).
 
 ## Demo script (PRD §12)
 1. Sign in as the recruiter → **Jobs → New job** → paste the JD → **Extract with AI** → publish.

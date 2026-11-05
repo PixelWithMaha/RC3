@@ -1,5 +1,7 @@
 // Shared helpers for app/api/* route handlers (server only).
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { createClient as createTokenClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -13,10 +15,19 @@ export type AuthContext = { supabase: SupabaseClient; user: User; profile: Profi
 
 /** Checks session + role (AUTH-5). Returns a ready NextResponse on failure. */
 export async function requireUser(role?: Role): Promise<AuthContext | NextResponse> {
-  const supabase = await createClient();
+  // Browser requests use the SSR cookie session; scripts (e.g. the demo seed) may send a Bearer token.
+  // Either way Supabase verifies the JWT and every query runs under that user's RLS.
+  const auth = (await headers()).get("authorization");
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  const supabase = token
+    ? createTokenClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = token ? await supabase.auth.getUser(token) : await supabase.auth.getUser();
   if (!user) return jsonError("Not authenticated", 401);
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (!profile) return jsonError("Profile not found", 403);
