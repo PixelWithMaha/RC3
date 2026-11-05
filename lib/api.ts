@@ -467,3 +467,19 @@ export async function getRecruiterAnalytics(): Promise<RecruiterAnalytics> {
   const mine = ((apps.data ?? []) as RankedApplication[]).filter((a) => a.recruiter_id === userId);
   return computeAnalytics(jobs, mine, events.data ?? [], interviews.data ?? []);
 }
+
+/** Everything the recruiter dashboard needs, in one round of parallel queries (RLS-scoped). */
+export async function getRecruiterDashboard() {
+  const supabase = createClient();
+  const userId = await requireUserId();
+  const [jobs, apps, events, interviews] = await Promise.all([
+    getRecruiterJobs(),
+    supabase.from("applications_ranked").select("*").eq("recruiter_id", userId).order("created_at", { ascending: false }),
+    supabase.from("application_events").select("application_id, to_status, created_at, event_type").eq("event_type", "status_change"),
+    getInterviews(),
+  ]);
+  for (const r of [apps, events]) if (r.error) throw new Error(r.error.message);
+  const rows = (apps.data ?? []) as RankedApplication[];
+  const ev = (events.data ?? []) as Pick<ApplicationEvent, "application_id" | "to_status" | "created_at" | "event_type">[];
+  return { jobs, apps: rows, events: ev, interviews, analytics: computeAnalytics(jobs, rows, ev, interviews) };
+}

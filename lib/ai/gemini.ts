@@ -7,7 +7,9 @@ import { EMBEDDING_DIM } from "@/lib/types";
 // spike (503/429) on one model doesn't break the demo.
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 export const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.8-flash";
-const MODEL_CHAIN = [...new Set([GEMINI_MODEL, GEMINI_FALLBACK_MODEL, "gemini-flash-latest", "gemini-3.5-flash-lite"])];
+// Lite models stay available when the big ones are overloaded, so they come right after the primary.
+const MODEL_CHAIN = [...new Set([GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", GEMINI_FALLBACK_MODEL])];
+const ATTEMPT_TIMEOUT_MS = 15_000; // a slow 503 on one model must not eat the whole budget
 const TOTAL_BUDGET_MS = 50_000; // stays under route maxDuration (60s)
 export const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 
@@ -58,7 +60,7 @@ export async function generateJSON<T>(opts: {
             temperature: opts.temperature ?? 0.1,
           },
         }),
-        Math.min(opts.timeoutMs ?? 30_000, deadline - Date.now()),
+        Math.min(opts.timeoutMs ?? ATTEMPT_TIMEOUT_MS, deadline - Date.now()),
       );
       const text = res.text;
       if (!text) throw new Error("Empty response from model");

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import { getNotifications, markNotificationRead } from "@/lib/api";
@@ -41,19 +41,21 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6">
+      <CursorSpot />
+      <header className="sticky top-0 z-30 border-b border-border bg-background">
+        <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-4 px-4 sm:px-6">
           <Link href={`/${role}`} className="flex items-center gap-2 font-heading font-bold">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">R</span>
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[15px] text-primary-foreground">R</span>
             RC3
           </Link>
-          <nav className="flex flex-1 gap-1 overflow-x-auto">
+          <nav className="flex flex-1 gap-1 overflow-x-auto" aria-label="Sections">
             {NAV[role].map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={isActive(n.href) ? "page" : undefined}
                 className={cn(
-                  "whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors",
+                  "whitespace-nowrap rounded-[10px] px-4 py-2 text-sm font-medium transition-colors",
                   isActive(n.href) ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -66,7 +68,7 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
           <LogoutButton />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="relative z-[1] mx-auto max-w-[1280px] px-4 pb-16 pt-7 sm:px-6">{children}</main>
     </div>
   );
 }
@@ -87,9 +89,7 @@ function Notifications() {
       >
         <Bell className="h-4 w-4" />
         {unread > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-            {unread}
-          </span>
+          <span aria-label={`${unread} unread`} className="dash-ping absolute right-1 top-1 h-2 w-2 rounded-full bg-absent" />
         )}
       </button>
       {open && (
@@ -112,5 +112,26 @@ function Notifications() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Soft spotlight that trails the cursor (skipped for reduced motion). */
+function CursorSpot() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const move = (e: MouseEvent) => {
+      if (ref.current) ref.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    };
+    window.addEventListener("mousemove", move);
+    return () => window.removeEventListener("mousemove", move);
+  }, []);
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none fixed left-0 top-0 z-0 -ml-[260px] -mt-[260px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.16),transparent_65%)] transition-transform duration-700 ease-out motion-reduce:hidden"
+      style={{ transform: "translate(-600px, -600px)" }}
+    />
   );
 }

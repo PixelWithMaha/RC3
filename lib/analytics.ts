@@ -69,3 +69,45 @@ export function computeAnalytics(
     commonGaps: [...gapMap.values()].sort((a, b) => b.count - a.count).slice(0, 8),
   };
 }
+
+// ---------------------------------------------------------------- dashboard helpers (time series, funnel)
+const DAY = 86_400_000;
+const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+
+/** Counts per day for the last `days` days (oldest first). */
+export function dailySeries(isoDates: string[], days: number, now = new Date()): number[] {
+  const today = startOfDay(now);
+  const out = Array(days).fill(0);
+  for (const iso of isoDates) {
+    const age = Math.floor((today - startOfDay(new Date(iso))) / DAY);
+    if (age >= 0 && age < days) out[days - 1 - age]++;
+  }
+  return out;
+}
+
+/** Week-over-week change in %, or null when there is nothing to compare. */
+export function weekDelta(isoDates: string[], now = new Date()): number | null {
+  const s = dailySeries(isoDates, 14, now);
+  const prev = s.slice(0, 7).reduce((a, b) => a + b, 0);
+  const cur = s.slice(7).reduce((a, b) => a + b, 0);
+  if (!prev) return cur ? 100 : null;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+
+export const FUNNEL_STAGES: ApplicationStatus[] = ["submitted", "parsed", "ai_assessed", "recruiter_review", "shortlisted", "interview", "selected"];
+
+/** How many applications ever reached each stage (from the audit trail + current status). */
+export function funnelReach(
+  apps: Pick<RankedApplication, "id" | "status">[],
+  events: Pick<ApplicationEvent, "application_id" | "to_status">[],
+): { status: ApplicationStatus; count: number }[] {
+  const reach = new Map<string, number>();
+  const bump = (id: string, s: ApplicationStatus | null) => {
+    const i = s ? FUNNEL_STAGES.indexOf(s) : -1;
+    if (i > (reach.get(id) ?? -1)) reach.set(id, i);
+  };
+  for (const a of apps) { reach.set(a.id, 0); bump(a.id, a.status); }
+  for (const e of events) if (reach.has(e.application_id)) bump(e.application_id, e.to_status);
+  // An application that skipped stages (e.g. shortlisted straight from AI assessment) still passed them.
+  return FUNNEL_STAGES.map((status, i) => ({ status, count: [...reach.values()].filter((r) => r >= i).length }));
+}

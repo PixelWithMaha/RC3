@@ -32,3 +32,25 @@ describe("computeAnalytics", () => {
     expect(r.byStage.find((s) => s.status === "rejected")?.count).toBe(1);
   });
 });
+
+import { dailySeries, funnelReach, weekDelta } from "@/lib/analytics";
+
+describe("dashboard helpers", () => {
+  const now = new Date("2026-11-10T12:00:00");
+  const day = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+  it("builds a daily series, oldest first", () => {
+    expect(dailySeries([day(0), day(0), day(2), day(9)], 3, now)).toEqual([1, 0, 2]);
+  });
+  it("computes week-over-week deltas", () => {
+    expect(weekDelta([day(1), day(2), day(8)], now)).toBe(100);
+    expect(weekDelta([], now)).toBeNull();
+  });
+  it("counts funnel reach including skipped stages", () => {
+    const f = funnelReach(
+      [{ id: "a", status: "shortlisted" }, { id: "b", status: "rejected" }],
+      [{ application_id: "b", to_status: "ai_assessed" }],
+    );
+    expect(f.find((s) => s.status === "ai_assessed")?.count).toBe(2);
+    expect(f.find((s) => s.status === "shortlisted")?.count).toBe(1);
+  });
+});

@@ -22,7 +22,6 @@ export async function POST(req: Request) {
       prompt: jobExtractPrompt(body.description),
       jsonSchema: JOB_EXTRACT_JSON_SCHEMA,
       zod: JobExtractZ,
-      timeoutMs: 45_000,
     });
     const result: JobExtraction = cleanJobExtraction(out);
     if (!result.required_skills.length && !result.preferred_skills.length) {
