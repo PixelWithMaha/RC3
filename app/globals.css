@@ -86,3 +86,19 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-card, .dash-bar, .dash-spark, .dash-line, .dash-area, .dash-dot, .dash-slide, .dash-flash td, .dash-ping { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Candidate resume screen motion ---------- */
+@keyframes rs-pop { from { opacity: 0; transform: scale(0.8); } }
+@keyframes rs-out { to { opacity: 0; transform: scale(0.85); } }
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+.rs-pop { animation: rs-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.rs-out { animation: rs-out 0.3s ease forwards; }
+.rs-spin { animation: rs-spin 0.7s linear infinite; }
+.rs-lift { transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s; }
+.rs-lift:hover, .rs-lift:focus-within { transform: translateY(-3px); border-color: hsl(var(--primary)); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28); }
+.rs-nudge { transition: transform 0.25s, border-color 0.25s; }
+.rs-nudge:hover { transform: translateX(4px); border-color: hsl(var(--primary)); }
+@media (prefers-reduced-motion: reduce) {
+  .rs-pop, .rs-out, .rs-spin { animation: none !important; }
+  .rs-lift, .rs-nudge { transition: none !important; }
+}
