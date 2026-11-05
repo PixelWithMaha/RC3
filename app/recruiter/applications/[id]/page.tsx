@@ -34,7 +34,22 @@ export default function ApplicationDetail() {
           </p>
         </div>
         {app.resume && (
-          <Button variant="outline" size="sm" onClick={async () => window.open(await getResumeFileUrl(app.resume!.file_path), "_blank")}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              // Open the tab synchronously (popup blockers), then point it at the signed URL.
+              const tab = window.open("", "_blank");
+              try {
+                const url = await getResumeFileUrl(app.resume!.file_path);
+                if (tab) tab.location.href = url;
+                else window.location.href = url;
+              } catch (e) {
+                tab?.close();
+                alert("Could not open the resume: " + (e as Error).message);
+              }
+            }}
+          >
             View resume PDF
           </Button>
         )}
