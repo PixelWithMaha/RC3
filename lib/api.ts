@@ -2,10 +2,12 @@
 // AI work always goes through app/api/* routes; nothing here touches AI keys.
 import { createClient } from "@/lib/supabase/client";
 import type {
-  ApplicationEvent, ApplicationStatus, CandidateInterview, Job, JobExtraction, JobStatus, JobWithCounts,
+  ApplicationEvent, ApplicationStatus, CandidateInterview, ConflictCheckResponse, Difficulty, Interview,
+  InterviewFeedback, InterviewQuestion, InterviewType, Job, SearchResult, JobExtraction, JobStatus, JobWithCounts,
   MatchResponse, Notification, ParseResumeResponse, ParsedResume, RankedApplication, RecruiterNote, Resume,
 } from "@/lib/types";
 import type { JobCreateInput, JobUpdateInput } from "@/lib/validation";
+import { computeAnalytics, type RecruiterAnalytics } from "@/lib/analytics";
 
 async function postJSON<T>(url: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<T> {
   const res = await fetch(url, {
@@ -337,4 +339,131 @@ export async function getNotifications(): Promise<Notification[]> {
 export async function markNotificationRead(id: string): Promise<void> {
   const { error } = await createClient().from("notifications").update({ read: true }).eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------- Interview questions (QUES-1..4)
+
+/** Returns stored questions, generating them on first call. regenerate=true replaces them. */
+export async function generateQuestions(applicationId: string, opts: { difficulty?: Difficulty; regenerate?: boolean } = {}): Promise<InterviewQuestion[]> {
+  const r = await postJSON<{ questions: InterviewQuestion[] }>("/api/questions", { applicationId, ...opts });
+  return r.questions;
+}
+
+export async function getQuestions(applicationId: string): Promise<InterviewQuestion[]> {
+  const { data, error } = await createClient().from("interview_questions").select("*").eq("application_id", applicationId).order("created_at");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as InterviewQuestion[];
+}
+
+export async function updateQuestion(id: string, patch: Partial<Pick<InterviewQuestion, "question" | "answer_guideline" | "difficulty">>): Promise<void> {
+  const { error } = await createClient().from("interview_questions").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteQuestion(id: string): Promise<void> {
+  const { error } = await createClient().from("interview_questions").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------- Interviews (INT-1..5)
+
+export interface ScheduleInput {
+  applicationId: string;
+  candidateId: string;
+  scheduledAt: string; // ISO with offset
+  durationMin: number;
+  interviewerName: string;
+  interviewerId?: string | null;
+  type: InterviewType;
+}
+
+export async function checkInterviewConflict(i: Omit<ScheduleInput, "applicationId" | "type"> & { excludeInterviewId?: string }): Promise<ConflictCheckResponse> {
+  return postJSON<ConflictCheckResponse>("/api/interviews/check-conflict", {
+    interviewerId: i.interviewerId ?? null,
+    interviewerName: i.interviewerName,
+    candidateId: i.candidateId,
+    start: i.scheduledAt,
+    duration: i.durationMin,
+    excludeInterviewId: i.excludeInterviewId,
+  });
+}
+
+/**
+ * INT-1: schedule. Returns conflicts instead of saving unless force=true (UI shows the warning first).
+ * Moves a shortlisted application to "interview" (recruiter action, audited).
+ */
+export async function scheduleInterview(input: ScheduleInput, force = false): Promise<{ interview: Interview | null; conflicts: ConflictCheckResponse }> {
+  const conflicts = await checkInterviewConflict(input);
+  if (conflicts.conflict && !force) return { interview: null, conflicts };
+  const supabase = createClient();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("interviews")
+    .insert({
+      application_id: input.applicationId,
+      scheduled_at: input.scheduledAt,
+      duration_min: input.durationMin,
+      interviewer_name: input.interviewerName,
+      interviewer_id: input.interviewerId ?? null,
+      type: input.type,
+      created_by: userId,
+    })
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Could not schedule interview");
+  const { data: app } = await supabase.from("applications").select("status").eq("id", input.applicationId).single();
+  if (app?.status === "shortlisted") await changeApplicationStatus(input.applicationId, "interview", "Interview scheduled");
+  return { interview: data as Interview, conflicts };
+}
+
+/** INT-2: interviews for one application, or all of the recruiter's interviews (with job + candidate). */
+export async function getInterviews(applicationId?: string): Promise<(Interview & { job_title: string | null; candidate_name: string | null })[]> {
+  let q = createClient()
+    .from("interviews")
+    .select("*, applications(jobs(title), profiles(full_name))")
+    .order("scheduled_at", { ascending: true });
+  if (applicationId) q = q.eq("application_id", applicationId);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => {
+    const { applications: a, ...rest } = row as Interview & { applications: { jobs: { title: string } | null; profiles: { full_name: string | null } | null } | null };
+    return { ...rest, job_title: a?.jobs?.title ?? null, candidate_name: a?.profiles?.full_name ?? null };
+  });
+}
+
+/** INT-4: structured feedback; marks the interview done. */
+export async function saveInterviewFeedback(interviewId: string, feedback: InterviewFeedback): Promise<void> {
+  for (const k of ["technical", "communication", "problem_solving", "culture_fit"] as const) {
+    if (!(feedback[k] >= 1 && feedback[k] <= 5)) throw new Error(`${k} rating must be 1-5`);
+  }
+  const { error } = await createClient().from("interviews").update({ feedback, status: "done" }).eq("id", interviewId);
+  if (error) throw new Error(error.message);
+}
+
+export async function cancelInterview(interviewId: string): Promise<void> {
+  const { error } = await createClient().from("interviews").update({ status: "cancelled" }).eq("id", interviewId);
+  if (error) throw new Error(error.message);
+}
+
+// INT-5: final decision = changeApplicationStatus(id, "selected" | "rejected", reason) — DB enforces job owner.
+
+// ---------------------------------------------------------------- Talent search (TI-1/2)
+export async function searchTalent(query: string, jobId?: string): Promise<SearchResult[]> {
+  const r = await postJSON<{ results: SearchResult[] }>("/api/search", { query, jobId });
+  return r.results;
+}
+
+// ---------------------------------------------------------------- Analytics (AN-1..6)
+export async function getRecruiterAnalytics(): Promise<RecruiterAnalytics> {
+  const supabase = createClient();
+  const [jobs, apps, events, interviews] = await Promise.all([
+    getRecruiterJobs(),
+    supabase.from("applications_ranked").select("*"),
+    supabase.from("application_events").select("application_id, to_status, created_at, event_type").eq("event_type", "status_change"),
+    supabase.from("interviews").select("scheduled_at, status"),
+  ]);
+  for (const r of [apps, events, interviews]) if (r.error) throw new Error(r.error.message);
+  const userId = await requireUserId();
+  const mine = ((apps.data ?? []) as RankedApplication[]).filter((a) => a.recruiter_id === userId);
+  return computeAnalytics(jobs, mine, events.data ?? [], interviews.data ?? []);
 }

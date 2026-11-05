@@ -59,6 +59,26 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // AUTH-4/5: role-based route guard (RLS still protects the data itself).
+  const path = request.nextUrl.pathname;
+  const needsRole = path.startsWith("/recruiter") || path.startsWith("/candidate") || path.startsWith("/protected");
+  if (user && needsRole) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.sub).maybeSingle();
+    const home = profile?.role === "recruiter" ? "/recruiter" : "/candidate";
+    const wrongArea =
+      path.startsWith("/protected") ||
+      (path.startsWith("/recruiter") && profile?.role !== "recruiter") ||
+      (path.startsWith("/candidate") && profile?.role !== "candidate");
+    if (wrongArea) {
+      const url = request.nextUrl.clone();
+      url.pathname = home;
+      url.search = "";
+      const redirect = NextResponse.redirect(url);
+      supabaseResponse.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+      return redirect;
+    }
+  }
+
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:

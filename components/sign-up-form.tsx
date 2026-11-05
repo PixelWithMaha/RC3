@@ -53,7 +53,7 @@ export function SignUpForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          emailRedirectTo: `${window.location.origin}/auth/login`,
           // AUTH-3: read by the handle_new_user trigger to create the profile with this role
           data: { role, full_name: fullName.trim() },
         },

@@ -198,3 +198,48 @@ export const MatchZ = z.object({
   qualification_note: z.string().catch(""), summary: z.string().catch(""),
 });
 export type MatchOutput = z.infer<typeof MatchZ>;
+
+// ---------------------------------------------------------------- Interview questions (QUES-1..3)
+export const QUESTIONS_SYSTEM = `You write interview questions for a recruiter. Use the job requirements and the candidate's
+anonymized resume. Produce two categories:
+- "role": questions on the job's required skills, especially gaps or partial matches that need probing.
+- "project": questions about the candidate's OWN listed projects and experience (reference them specifically).
+For each question give an answer_guideline: what a strong answer covers (2-4 short points in one string).
+Difficulty: beginner = fundamentals, intermediate = applied/design trade-offs, advanced = depth, scale, failure modes.
+Never ask about personal attributes (age, gender, family, religion, nationality, health).`;
+
+export function questionsPrompt(job: unknown, resume: unknown, gaps: unknown, difficulties: string[]): string {
+  return `Generate 2 "role" and 1 "project" question for EACH difficulty in: ${difficulties.join(", ")}.
+<job>${JSON.stringify(job)}</job>
+<anonymized_resume>${JSON.stringify(resume)}</anonymized_resume>
+<known_gaps>${JSON.stringify(gaps)}</known_gaps>`;
+}
+
+export const QUESTIONS_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
+          category: { type: "string", enum: ["role", "project"] },
+          question: { type: "string" },
+          answer_guideline: { type: "string" },
+        },
+        required: ["difficulty", "category", "question", "answer_guideline"],
+      },
+    },
+  },
+  required: ["questions"],
+} as const;
+
+export const QuestionsZ = z.object({
+  questions: z.array(z.object({
+    difficulty: z.enum(["beginner", "intermediate", "advanced"]),
+    category: z.enum(["role", "project"]).catch("role"),
+    question: z.string().min(5),
+    answer_guideline: z.string().catch(""),
+  })).min(1),
+});
