@@ -1,370 +1,232 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  AnimatePresence,
   motion,
   useMotionTemplate,
+  useMotionValue,
+  useScroll,
+  useSpring,
   useTransform,
   type MotionValue,
 } from "motion/react";
-import {
-  ArrowDown,
-  ArrowRight,
-  BriefcaseBusiness,
-  Check,
-  FileText,
-  Search,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BriefcaseBusiness, FileText, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Chip, Glow, Panel, Scene, SceneCopy, useReduced, useStep } from "./primitives";
+import { Chip, Reveal, Scene, SceneCopy, useReduced } from "./primitives";
 
-const spring = { type: "spring", stiffness: 260, damping: 26 } as const;
+const MATCHED = "#2DD4BF";
+const PRIMARY = "#7C5CFF";
+const LINE = "#272C3F";
 
-// =============================================================== Hero
-export function Hero() {
-  const reduced = useReduced();
+// =============================================================== shared bits
+/** Button that drifts toward the cursor (magnetic hover). */
+export function Magnetic({ children, className }: { children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const x = useSpring(0, { stiffness: 250, damping: 18 });
+  const y = useSpring(0, { stiffness: 250, damping: 18 });
   return (
-    <section className="relative flex min-h-[100svh] items-center overflow-hidden pb-12 pt-24">
-      <Glow />
-      <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
-        <div>
-          <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-primary">
-            Recruitment &amp; talent intelligence
-          </p>
-          <h1 className="text-5xl font-bold leading-[0.95] sm:text-6xl lg:text-7xl">
-            The Evidence <span className="text-primary">Trail</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Every AI score in RC3 points back to a real line in the resume. Recruiters see the proof and
-            the gaps, and then make the call themselves.
-          </p>
-          <div className="mt-8">
-            <CtaButtons />
-          </div>
-          <p className="mt-10 flex items-center gap-2 text-sm text-muted-foreground">
-            <ArrowDown className="h-4 w-4 animate-bounce motion-reduce:animate-none" />
-            Scroll to follow one resume through RC3
-          </p>
-        </div>
-        <ScanningResume reduced={reduced} />
-      </div>
-    </section>
+    <motion.span
+      ref={ref}
+      style={{ x, y }}
+      className={cn("inline-block", className)}
+      onMouseMove={(e) => {
+        const r = ref.current!.getBoundingClientRect();
+        x.set((e.clientX - r.left - r.width / 2) * 0.3);
+        y.set((e.clientY - r.top - r.height / 2) * 0.3);
+      }}
+      onMouseLeave={() => {
+        x.set(0);
+        y.set(0);
+      }}
+    >
+      {children}
+    </motion.span>
   );
 }
 
-const SCAN_LINES: { text: string; hits: string[] }[] = [
-  { text: "Backend developer · 4 years building web services", hits: ["4 years"] },
-  { text: "Built REST services in Django backed by Postgres.", hits: ["Django", "Postgres"] },
-  { text: "Shipped dashboards in JS and ReactJS.", hits: ["JS"] },
-  { text: "Automated reports with Python scripts.", hits: ["Python"] },
-  { text: "BSc Computer Science · FAST NUCES", hits: ["BSc Computer Science"] },
-];
-const SCAN_SECONDS = 3.2;
-const SCAN_PAUSE = 0.8;
-
-function ScanningResume({ reduced }: { reduced: boolean }) {
-  const cycle = SCAN_SECONDS + SCAN_PAUSE;
+function Btn({ href, children, outline }: { href: string; children: ReactNode; outline?: boolean }) {
   return (
-    <Panel className="mx-auto w-full max-w-md overflow-hidden">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/20 font-heading font-bold text-primary">
-          SA
-        </div>
-        <div>
-          <p className="font-heading font-semibold">sara-ahmed-resume.pdf</p>
-          <p className="text-xs text-muted-foreground">Scanning for evidence…</p>
-        </div>
-      </div>
-      <div className="relative space-y-3 font-mono text-[12px] leading-relaxed text-foreground/80 sm:text-[13px]">
-        {SCAN_LINES.map((line, i) => {
-          const at = ((i + 0.6) / SCAN_LINES.length) * (SCAN_SECONDS / cycle);
-          return (
-            <p key={i}>
-              {splitHits(line.text, line.hits).map((part, j) =>
-                part.hit ? (
-                  <motion.span
-                    key={j}
-                    className="rounded px-0.5"
-                    initial={false}
-                    animate={
-                      reduced
-                        ? { backgroundColor: "rgba(45,212,191,0.22)", color: "#2DD4BF" }
-                        : {
-                            backgroundColor: ["rgba(45,212,191,0)", "rgba(45,212,191,0)", "rgba(45,212,191,0.22)", "rgba(45,212,191,0.22)"],
-                            color: ["#E6E8F2", "#E6E8F2", "#2DD4BF", "#2DD4BF"],
-                          }
-                    }
-                    transition={
-                      reduced ? { duration: 0 } : { duration: cycle, times: [0, at, at + 0.04, 1], repeat: Infinity, ease: "linear" }
-                    }
-                  >
-                    {part.text}
-                  </motion.span>
-                ) : (
-                  <span key={j}>{part.text}</span>
-                ),
-              )}
-            </p>
-          );
-        })}
-        {!reduced && (
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-[-24px] h-12 border-b-2 border-primary bg-gradient-to-b from-transparent to-primary/25"
-            initial={{ top: "-15%" }}
-            animate={{ top: ["-15%", "95%"] }}
-            transition={{ duration: SCAN_SECONDS, repeat: Infinity, repeatDelay: SCAN_PAUSE, ease: "linear" }}
-          />
+    <Magnetic>
+      <Link
+        href={href}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-[15px] font-semibold transition-colors",
+          outline ? "border border-border text-foreground hover:border-foreground/40" : "bg-primary text-primary-foreground hover:bg-primary/90",
         )}
-      </div>
-      <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
-        <Chip tone="matched"><Check className="h-3.5 w-3.5" /> 6 excerpts verified</Chip>
-        <Chip tone="neutral">0 hallucinations</Chip>
-      </div>
-    </Panel>
+      >
+        {children}
+      </Link>
+    </Magnetic>
   );
 }
 
-function splitHits(text: string, hits: string[]) {
-  const parts: { text: string; hit: boolean }[] = [];
-  let rest = text;
-  while (rest) {
-    const next = hits
-      .map((h) => ({ h, i: rest.search(new RegExp(`\\b${h}\\b`)) }))
-      .filter((x) => x.i >= 0)
-      .sort((a, b) => a.i - b.i)[0];
-    if (!next) {
-      parts.push({ text: rest, hit: false });
-      break;
-    }
-    if (next.i > 0) parts.push({ text: rest.slice(0, next.i), hit: false });
-    parts.push({ text: next.h, hit: true });
-    rest = rest.slice(next.i + next.h.length);
-  }
-  return parts;
+export function CtaButtons() {
+  return (
+    <div className="flex flex-wrap justify-center gap-3">
+      <Btn href="/auth/sign-up?role=recruiter"><BriefcaseBusiness className="h-4 w-4" /> I&apos;m hiring</Btn>
+      <Btn href="/auth/sign-up?role=candidate" outline><FileText className="h-4 w-4" /> I&apos;m a candidate</Btn>
+    </div>
+  );
 }
 
-// =============================================================== 01 Upload
-export function UploadScene() {
+function Bar({ value, className }: { value: MotionValue<string> | string; className?: string }) {
   return (
-    <Scene id="upload" length={220}>
-      {(p) => (
-        <>
-          <SceneCopy step="01" eyebrow="Upload" title="Drop a PDF. Get structured evidence.">
-            Text is extracted on the server and parsed into skills, experience and projects. Every item
-            keeps the exact line it came from.
-          </SceneCopy>
-          <UploadVisual p={p} />
-        </>
-      )}
+    <div className={cn("h-2 overflow-hidden rounded-full bg-secondary", className)}>
+      <motion.i className="block h-full rounded-full bg-gradient-to-r from-primary to-matched" style={{ width: value }} />
+    </div>
+  );
+}
+
+// =============================================================== 1 Hero: the pile sorts itself
+const PILE = [
+  { n: "Alex Rivers", s: 68 }, { n: "Maria Khan", s: 74 }, { n: "Bilal K.", s: 63 }, { n: "Dev Patel", s: 71 },
+  { n: "Lena Brandt", s: 59 }, { n: "Hina R.", s: 31 }, { n: "Chen Wei", s: 77 }, { n: "Ayesha Noor", s: 66 },
+  { n: "Usman T.", s: 70 }, { n: "Sara Ahmed", s: 84 },
+];
+// Deterministic scatter (no hydration mismatch): vw, vh, deg
+const SCATTER = [
+  [-38, -30, -18], [34, -26, 14], [-30, 24, 9], [40, 18, -12], [-12, -36, 22],
+  [16, 34, -20], [-42, 2, 6], [28, -4, -24], [-4, 30, 16], [8, -18, -8],
+];
+
+export function Hero() {
+  return (
+    <Scene id="hero" length={230}>
+      {(p) => <HeroInner p={p} />}
     </Scene>
   );
 }
 
-const UPLOAD_STEPS = ["Text extracted from PDF", "Structured by Gemini", "Excerpts matched to raw text"];
-
-function UploadVisual({ p }: { p: MotionValue<number> }) {
-  const docY = useTransform(p, [0, 0.35], [-150, 0]);
-  const docRotate = useTransform(p, [0, 0.35], [-10, 0]);
-  const docOpacity = useTransform(p, [0, 0.12], [0, 1]);
-  const zoneBorder = useTransform(p, [0.28, 0.38], ["rgba(124,92,255,0.25)", "rgba(124,92,255,0.9)"]);
-  const bar = useTransform(p, [0.4, 0.85], ["0%", "100%"]);
-  const label = useTransform(p, (v): string =>
-    v < 0.38
-      ? "Waiting for a PDF…"
-      : v < 0.55
-        ? "Extracting text…"
-        : v < 0.7
-          ? "Parsing with Gemini…"
-          : v < 0.85
-            ? "Verifying excerpts…"
-            : "Done · 9 skills · 2 roles · 1 project",
-  );
-  const step = useStep(p, [0.55, 0.7, 0.85]);
-
+function HeroInner({ p }: { p: MotionValue<number> }) {
+  const copyY = useTransform(p, [0, 0.8], [0, -60]);
+  const copyOpacity = useTransform(p, [0, 0.8], [1, 0.4]);
   return (
-    <Panel className="mx-auto w-full max-w-lg">
-      <motion.div
-        style={{ borderColor: zoneBorder }}
-        className="relative flex h-40 items-end justify-center rounded-xl border-2 border-dashed bg-background/40 pb-4 sm:h-52"
-      >
-        <motion.div
-          style={{ y: docY, rotate: docRotate, opacity: docOpacity }}
-          className="absolute top-4 flex h-24 w-20 flex-col gap-1.5 rounded-lg border border-border bg-foreground/95 p-2.5 shadow-xl sm:top-6 sm:h-32 sm:w-24"
+    <>
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        {PILE.map((c, i) => <PileCard key={c.n} i={i} p={p} {...c} />)}
+      </div>
+      <motion.div style={{ y: copyY, opacity: copyOpacity }} className="relative z-10 -mt-24">
+        <p className="mb-5 font-mono text-xs uppercase tracking-[0.2em] text-primary">RC3 · Recruitment &amp; talent intelligence</p>
+        <Reveal as="h1" text="The Evidence Trail" className="text-5xl font-bold leading-[1.02] sm:text-7xl lg:text-[92px]" delay={0.2} />
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.6 }}
+          className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground"
         >
-          <span className="self-start rounded bg-absent px-1 font-mono text-[9px] font-bold text-background">PDF</span>
-          {[80, 60, 90, 50, 70].map((w, i) => (
-            <span key={i} className="h-1 rounded bg-background/30" style={{ width: `${w}%` }} />
-          ))}
+          Resumes become transparent score breakdowns, verified skills and fair decisions that always stay with you.
+        </motion.p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="mt-8">
+          <CtaButtons />
+          <p className="mt-6 text-sm text-muted-foreground">Scroll. The pile of resumes sorts itself.</p>
         </motion.div>
-        <p className="font-mono text-xs text-muted-foreground">resume.pdf · 84 KB</p>
       </motion.div>
-
-      <div className="mt-5">
-        <div className="mb-2 flex justify-between font-mono text-xs">
-          <motion.span className="text-foreground">{label}</motion.span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-secondary">
-          <motion.div style={{ width: bar }} className="h-full rounded-full bg-gradient-to-r from-primary to-matched" />
-        </div>
-      </div>
-
-      <ul className="mt-5 space-y-2 text-sm">
-        {UPLOAD_STEPS.map((s, i) => (
-          <motion.li
-            key={s}
-            initial={false}
-            animate={{ opacity: step > i ? 1 : 0.35, x: step > i ? 0 : -6 }}
-            transition={spring}
-            className="flex items-center gap-2"
-          >
-            <span
-              className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full border transition-colors",
-                step > i ? "border-matched bg-matched/20 text-matched" : "border-border text-transparent",
-              )}
-            >
-              <Check className="h-3 w-3" />
-            </span>
-            {s}
-          </motion.li>
-        ))}
-      </ul>
-    </Panel>
+    </>
   );
 }
 
-// =============================================================== 02 Extract
-type Token = { raw: string; canonical: string };
-const EXTRACT_LINES: (string | Token)[][] = [
-  ["Built REST services in ", { raw: "Django", canonical: "Django" }, " backed by ", { raw: "Postgres", canonical: "PostgreSQL" }, "."],
-  ["Shipped dashboards in ", { raw: "JS", canonical: "JavaScript" }, " and ", { raw: "ReactJS", canonical: "React" }, "."],
-  ["Automated reports with ", { raw: "Python", canonical: "Python" }, " scripts."],
-];
-const TOKENS = EXTRACT_LINES.flat().filter((x): x is Token => typeof x !== "string");
-
-export function ExtractScene() {
+function PileCard({ i, p, n, s }: { i: number; p: MotionValue<number>; n: string; s: number }) {
+  const [sx, sy, sr] = SCATTER[i];
+  const range = [i * 0.03, 0.6 + i * 0.03];
+  const x = useTransform(p, range, [`${sx}vw`, "0vw"]);
+  const y = useTransform(p, range, [`${sy}vh`, `${30 - i * 0.7}vh`]);
+  const rotate = useTransform(p, range, [sr, (i - 5) * 2]);
   return (
-    <Scene id="extract" length={260}>
+    <motion.div
+      style={{ x, y, rotate }}
+      className="absolute left-1/2 top-1/2 -ml-[95px] -mt-[45px] w-[190px] rounded-2xl border border-border bg-surface/95 p-3.5 text-left opacity-90 shadow-xl"
+    >
+      <b className="text-sm">{n}</b>
+      <Bar value={`${s}%`} className="my-2.5" />
+      <small className="text-xs text-muted-foreground">{s}% match</small>
+    </motion.div>
+  );
+}
+
+// =============================================================== 2 Parse: skills glow, become chips
+const DOC: (string | { raw: string; chip: string })[] = [
+  "Backend developer. Built REST services in ", { raw: "Python", chip: "Python" }, " and ", { raw: "Django", chip: "Django" },
+  ", stored data in ", { raw: "Postgres", chip: "PostgreSQL" }, ", documented ", { raw: "REST API", chip: "REST API" },
+  " design and shipped dashboards in ", { raw: "JS", chip: "JavaScript" }, ".",
+];
+const SKILLS = DOC.filter((d): d is { raw: string; chip: string } => typeof d !== "string");
+const skillAt = (i: number) => 0.2 + i * 0.12;
+
+export function ParseScene() {
+  return (
+    <Scene id="parse" length={300}>
       {(p) => (
         <>
-          <SceneCopy step="02" eyebrow="Extract" title="Words become skills.">
-            Equivalent terms are normalized, so <span className="font-mono text-foreground">JS</span> becomes{" "}
-            <span className="font-mono text-foreground">JavaScript</span> and{" "}
-            <span className="font-mono text-foreground">Postgres</span> becomes{" "}
-            <span className="font-mono text-foreground">PostgreSQL</span>. Nothing gets missed because of
-            wording.
+          <SceneCopy title="One resume, read like a recruiter would">
+            Skills are found, normalized and listed with proof. <span className="font-mono text-foreground">Postgres</span> becomes{" "}
+            <span className="font-mono text-foreground">PostgreSQL</span>, <span className="font-mono text-foreground">JS</span> becomes{" "}
+            <span className="font-mono text-foreground">JavaScript</span>.
           </SceneCopy>
-          <ExtractVisual p={p} />
+          <ParseVisual p={p} />
         </>
       )}
     </Scene>
   );
 }
 
-function ExtractVisual({ p }: { p: MotionValue<number> }) {
-  const thresholds = TOKENS.map((_, i) => 0.08 + i * 0.09);
-  const lifted = useStep(p, thresholds);
-  const morphed = useStep(p, [0.68]) > 0;
-  let tokenIndex = -1;
-
+function ParseVisual({ p }: { p: MotionValue<number> }) {
+  const docY = useTransform(p, [0, 0.15], [70, 0]);
+  const docO = useTransform(p, [0, 0.15], [0, 1]);
+  const docR = useTransform(p, [0, 0.15], [-4, 0]);
+  const count = useTransform(p, (v) => `${SKILLS.filter((_, i) => v >= skillAt(i) + 0.06).length} skills extracted`);
+  let k = -1;
   return (
-    <Panel className="mx-auto w-full max-w-lg">
-      <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Resume text</p>
-      <div className="space-y-2 font-mono text-[12px] leading-relaxed sm:text-sm">
-        {EXTRACT_LINES.map((line, li) => (
-          <p key={li} className="text-foreground/75">
-            {line.map((part, pi) => {
-              if (typeof part === "string") return <span key={pi}>{part}</span>;
-              tokenIndex++;
-              const on = lifted > tokenIndex;
-              return (
-                <span
-                  key={pi}
-                  className={cn(
-                    "rounded px-0.5 transition-colors duration-300",
-                    on ? "bg-primary/25 text-foreground" : "",
-                  )}
-                >
-                  {part.raw}
-                </span>
-              );
-            })}
-          </p>
-        ))}
+    <div className="grid w-full max-w-5xl items-center gap-10 text-left md:grid-cols-2">
+      <motion.div style={{ y: docY, opacity: docO, rotate: docR }} className="rounded-xl bg-foreground p-7 text-[17px] leading-[1.9] text-background shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <h4 className="mb-1.5 font-heading text-xl font-bold">Sara Ahmed</h4>
+        {DOC.map((d, i) => (typeof d === "string" ? <span key={i}>{d}</span> : <Glow key={i} p={p} at={skillAt(++k)}>{d.raw}</Glow>))}
+      </motion.div>
+      <div>
+        <motion.div className="font-heading text-2xl font-bold text-matched">{count}</motion.div>
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          {SKILLS.map((s, i) => <FlyChip key={s.chip} p={p} at={skillAt(i)}>{s.chip}</FlyChip>)}
+        </div>
+        <p className="mt-6 font-mono text-xs text-muted-foreground">each chip keeps its source line → hallucination check</p>
       </div>
-
-      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        normalized skills
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <div className="flex min-h-[76px] flex-wrap content-start gap-2">
-        <AnimatePresence>
-          {TOKENS.slice(0, lifted).map((t) => {
-            const changes = t.raw !== t.canonical;
-            const text = morphed ? t.canonical : t.raw;
-            return (
-              <motion.span
-                key={t.raw}
-                layout
-                initial={{ opacity: 0, y: -48, scale: 0.8 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -24 }}
-                transition={spring}
-              >
-                <Chip tone={morphed && changes ? "matched" : "primary"}>
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.span
-                      key={text}
-                      initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {text}
-                    </motion.span>
-                  </AnimatePresence>
-                </Chip>
-              </motion.span>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-      <motion.p
-        initial={false}
-        animate={{ opacity: morphed ? 1 : 0 }}
-        className="mt-3 font-mono text-[11px] text-matched"
-      >
-        3 aliases normalized · JS → JavaScript · Postgres → PostgreSQL · ReactJS → React
-      </motion.p>
-    </Panel>
+    </div>
   );
 }
 
-// =============================================================== 03 Match
-const SLOTS = [
-  { name: "Python", importance: 5, excerpt: "Automated reports with Python scripts." },
-  { name: "Django", importance: 5, excerpt: "Built REST services in Django…" },
-  { name: "PostgreSQL", importance: 4, excerpt: "…backed by Postgres." },
-  { name: "Docker", importance: 4, excerpt: null },
+function Glow({ p, at, children }: { p: MotionValue<number>; at: number; children: ReactNode }) {
+  const bg = useTransform(p, [at, at + 0.05], ["rgba(124,92,255,0.15)", MATCHED]);
+  return <motion.span style={{ backgroundColor: bg }} className="rounded-md px-1.5 py-0.5 font-semibold">{children}</motion.span>;
+}
+
+function FlyChip({ p, at, children }: { p: MotionValue<number>; at: number; children: ReactNode }) {
+  const r = [at + 0.03, at + 0.11];
+  const opacity = useTransform(p, r, [0, 1]);
+  const x = useTransform(p, r, [-120, 0]);
+  const scale = useTransform(p, r, [0.6, 1]);
+  return (
+    <motion.span style={{ opacity, x, scale }}>
+      <Chip tone="matched" className="px-4 py-2 !text-base">{children}</Chip>
+    </motion.span>
+  );
+}
+
+// =============================================================== 3 Match: lines follow meaning
+const LEFT = ["Python", "Django", "PostgreSQL", "Docker"];
+const RIGHT = ["“stored data in Postgres”", "“python3 report scripts”", "“REST services in Django”"];
+const PATHS = [
+  { d: "M0 35C228 35 228 105 456 105", label: "python3 ≈ Python", top: "25%", left: "50%" },
+  { d: "M0 105C228 105 228 175 456 175", label: "Django ✓ excerpt verified", top: "50%", left: "50%" },
+  { d: "M0 175C228 175 228 35 456 35", label: "Postgres ≈ PostgreSQL", top: "37.5%", left: "30%" },
 ];
-const TRAY = ["Python", "Django", "PostgreSQL", "JavaScript", "React"];
+const pathAt = (i: number) => 0.3 + i * 0.17;
 
 export function MatchScene() {
   return (
     <Scene id="match" length={280}>
       {(p) => (
         <>
-          <SceneCopy step="03" eyebrow="Match" title="Skills land in the job's slots, with proof.">
-            Each requirement is filled only when there&apos;s an excerpt to back it up. When nothing is
-            found, RC3 says <span className="text-missing">missing evidence</span>. That&apos;s different
-            from a <span className="text-absent">confirmed absence</span>, and RC3 keeps the two apart.
+          <SceneCopy title="Meaning, not just keywords">
+            Job requirements on the left, resume evidence on the right. A match needs proof — when there is none, RC3 says so.
           </SceneCopy>
           <MatchVisual p={p} />
         </>
@@ -374,127 +236,72 @@ export function MatchScene() {
 }
 
 function MatchVisual({ p }: { p: MotionValue<number> }) {
-  const step = useStep(p, [0.12, 0.26, 0.4, 0.58, 0.72]);
-  const flown = Math.min(step, 3);
-
+  const nodScale = useTransform(p, [0.82, 0.92], [1, 1.08]);
+  const nodGlow = useTransform(p, [0.82, 0.92], ["0 0 0px rgba(245,181,68,0)", "0 0 28px rgba(245,181,68,0.45)"]);
   return (
-    <div className="mx-auto w-full max-w-lg space-y-4">
-      <div className="flex min-h-[34px] flex-wrap justify-center gap-2">
-        {TRAY.map((s, i) => (
-          <motion.span
-            key={s}
-            initial={false}
-            animate={i < flown ? { opacity: 0, y: 40, scale: 0.7 } : { opacity: 1, y: 0, scale: 1 }}
-            transition={spring}
-          >
-            <Chip tone="primary">{s}</Chip>
-          </motion.span>
-        ))}
-      </div>
-
-      <Panel>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <BriefcaseBusiness className="h-4 w-4 text-primary" />
-            <p className="font-heading font-semibold">Backend Developer</p>
-          </div>
-          <span className="font-mono text-[11px] text-muted-foreground">required skills</span>
-        </div>
-        <ul className="space-y-2.5">
-          {SLOTS.map((slot, i) => {
-            const filled = i < 3 && flown > i;
-            const missing = i === 3 && step >= 4;
-            return (
-              <li
-                key={slot.name}
-                className={cn(
-                  "rounded-xl border p-3 transition-colors duration-500",
-                  filled ? "border-matched/60 bg-matched/5" : missing ? "border-missing/60 bg-missing/5" : "border-dashed border-border",
-                )}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{slot.name}</span>
-                    <span className="flex gap-0.5" aria-label={`importance ${slot.importance} of 5`}>
-                      {Array.from({ length: 5 }, (_, d) => (
-                        <span key={d} className={cn("h-1.5 w-1.5 rounded-full", d < slot.importance ? "bg-primary" : "bg-secondary")} />
-                      ))}
-                    </span>
-                  </div>
-                  <AnimatePresence mode="wait" initial={false}>
-                    {filled ? (
-                      <motion.span key="m" initial={{ opacity: 0, y: -60, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={spring}>
-                        <Chip tone="matched"><Check className="h-3.5 w-3.5" /> Matched</Chip>
-                      </motion.span>
-                    ) : missing ? (
-                      <motion.span key="x" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={spring}>
-                        <Chip tone="missing">Missing evidence</Chip>
-                      </motion.span>
-                    ) : (
-                      <motion.span key="e" exit={{ opacity: 0 }} className="font-mono text-[11px] text-muted-foreground">
-                        awaiting evidence
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <AnimatePresence initial={false}>
-                  {(filled || missing) && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className={cn("overflow-hidden font-mono text-[11px] sm:text-xs", filled ? "text-matched/90" : "text-missing/90")}
-                    >
-                      <span className="block pt-2">
-                        {filled ? `“${slot.excerpt}”` : "Not mentioned in the resume · Learn: containerize a Django service"}
-                      </span>
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </li>
-            );
-          })}
-        </ul>
-      </Panel>
-
+    <div className="relative grid w-full max-w-4xl grid-cols-[140px_1fr_140px] grid-rows-[repeat(4,70px)] text-sm sm:grid-cols-[220px_1fr_220px] sm:text-base">
+      {LEFT.map((l, i) => <MatchBox key={l} p={p} i={i} col={1}>{l}</MatchBox>)}
+      <svg viewBox="0 0 456 280" preserveAspectRatio="none" aria-hidden className="col-start-2 row-span-4 row-start-1 h-full w-full overflow-visible">
+        {PATHS.map((path, i) => <MatchPath key={i} p={p} i={i} d={path.d} />)}
+      </svg>
+      {RIGHT.map((r, i) => <MatchBox key={r} p={p} i={i + 4} col={3} mono>{r}</MatchBox>)}
       <motion.div
-        initial={false}
-        animate={{ opacity: step >= 5 ? 1 : 0.45 }}
-        className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground"
+        style={{ scale: nodScale, boxShadow: nodGlow, gridColumn: 3, gridRow: 4 }}
+        className="self-center rounded-xl border border-missing/60 bg-missing/15 px-3 py-3 text-center font-semibold text-missing"
       >
-        <Legend color="bg-matched" label="Matched · excerpt found" />
-        <Legend color="bg-missing" label="Missing · not mentioned" />
-        <Legend color="bg-absent" label="Absent · explicitly lacking" />
+        No evidence found
       </motion.div>
+      {PATHS.map((path, i) => <MatchLabel key={i} p={p} i={i} {...path} />)}
     </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function MatchBox({ p, i, col, mono, children }: { p: MotionValue<number>; i: number; col: number; mono?: boolean; children: ReactNode }) {
+  const r = [i * 0.03, 0.12 + i * 0.03];
+  const opacity = useTransform(p, r, [0, 1]);
+  const y = useTransform(p, r, [30, 0]);
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={cn("h-2 w-2 rounded-full", color)} />
-      {label}
-    </span>
+    <motion.div
+      style={{ opacity, y, gridColumn: col, gridRow: (i % 4) + 1 }}
+      className={cn("self-center rounded-xl border border-border bg-surface px-3 py-3 text-center font-semibold", mono && "font-mono text-xs font-normal sm:text-sm")}
+    >
+      {children}
+    </motion.div>
   );
 }
 
-// =============================================================== 04 Score
+function MatchPath({ p, i, d }: { p: MotionValue<number>; i: number; d: string }) {
+  const len = useTransform(p, [pathAt(i), pathAt(i) + 0.12], [0, 1]);
+  return <motion.path d={d} fill="none" stroke={MATCHED} strokeWidth={2.5} strokeLinecap="round" style={{ pathLength: len }} />;
+}
+
+function MatchLabel({ p, i, label, top, left }: { p: MotionValue<number>; i: number; label: string; top: string; left: string }) {
+  const r = [pathAt(i) + 0.12, pathAt(i) + 0.16];
+  const opacity = useTransform(p, r, [0, 1]);
+  const scale = useTransform(p, r, [0.6, 1]);
+  return (
+    <motion.span style={{ opacity, scale, top, left }} className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap">
+      <Chip tone="matched" className="!text-xs">{label}</Chip>
+    </motion.span>
+  );
+}
+
+// =============================================================== 4 Score: ring + bars + reasons
 const BARS = [
-  { label: "Skills", weight: 0.5, value: 80 },
-  { label: "Experience", weight: 0.25, value: 92 },
-  { label: "Projects", weight: 0.15, value: 88 },
-  { label: "Qualifications", weight: 0.1, value: 78 },
+  { label: "Skills", w: 0.5, v: 80 },
+  { label: "Experience", w: 0.25, v: 92 },
+  { label: "Projects", w: 0.15, v: 88 },
+  { label: "Qualifications", w: 0.1, v: 78 },
 ];
-const TOTAL = BARS.reduce((s, b) => s + b.weight * b.value, 0); // 84
+const TOTAL = BARS.reduce((s, b) => s + b.w * b.v, 0); // 84
 
 export function ScoreScene() {
   return (
-    <Scene id="score" length={240}>
+    <Scene id="score" length={260}>
       {(p) => (
         <>
-          <SceneCopy step="04" eyebrow="Score" title="A score you can audit.">
-            The model rates each dimension, but the weighted total is calculated in code, not by the LLM.
-            The same evidence always gives the same number.
+          <SceneCopy title="Every score comes with its reasons">
+            The weighted total is computed in code, not by the LLM, and every claim links to the exact line in the resume.
           </SceneCopy>
           <ScoreVisual p={p} />
         </>
@@ -504,271 +311,211 @@ export function ScoreScene() {
 }
 
 function ScoreVisual({ p }: { p: MotionValue<number> }) {
-  const ring = useTransform(p, [0.08, 0.6], [0, TOTAL / 100]);
-  const score = useTransform(p, [0.08, 0.6], [0, TOTAL]);
-  const scoreText = useTransform(score, (v) => Math.round(v).toString());
-  const formulaOpacity = useTransform(p, [0.62, 0.75], [0, 1]);
-
+  const ring = useTransform(p, [0, 0.55], [0, TOTAL / 100]);
+  const num = useTransform(p, [0, 0.55], [0, TOTAL]);
+  const numText = useTransform(num, (v) => `${Math.round(v)}`);
+  const qO = useTransform(p, [0.4, 0.55], [0, 1]);
+  const qY = useTransform(p, [0.4, 0.55], [40, 0]);
+  const bO = useTransform(p, [0.55, 0.7], [0, 1]);
+  const bY = useTransform(p, [0.55, 0.7], [40, 0]);
   return (
-    <Panel className="mx-auto w-full max-w-lg">
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
-        <div className="relative h-36 w-36 shrink-0 sm:h-44 sm:w-44">
-          <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-            <defs>
-              <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#7C5CFF" />
-                <stop offset="100%" stopColor="#2DD4BF" />
-              </linearGradient>
-            </defs>
-            <circle cx="100" cy="100" r="84" fill="none" stroke="#1F2438" strokeWidth="14" />
-            <motion.circle
-              cx="100"
-              cy="100"
-              r="84"
-              fill="none"
-              stroke="url(#ring)"
-              strokeWidth="14"
-              strokeLinecap="round"
-              style={{ pathLength: ring }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span className="font-heading text-4xl font-bold sm:text-5xl">{scoreText}</motion.span>
-            <span className="text-xs text-muted-foreground">job relevance</span>
-          </div>
-        </div>
-        <div className="w-full space-y-3">
-          {BARS.map((b, i) => (
-            <ScoreBar key={b.label} p={p} index={i} {...b} />
-          ))}
+    <div className="grid w-full max-w-5xl items-center gap-10 text-left md:grid-cols-[auto_1fr_1fr]">
+      <div className="relative mx-auto h-[190px] w-[190px]">
+        <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+          <defs>
+            <linearGradient id="ring2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={PRIMARY} />
+              <stop offset="100%" stopColor={MATCHED} />
+            </linearGradient>
+          </defs>
+          <circle cx="60" cy="60" r="54" fill="none" stroke={LINE} strokeWidth="12" />
+          <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#ring2)" strokeWidth="12" strokeLinecap="round" style={{ pathLength: ring }} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <motion.span className="font-heading text-5xl font-bold">{numText}</motion.span>
+          <span className="text-xs text-muted-foreground">job relevance</span>
         </div>
       </div>
-      <motion.p
-        style={{ opacity: formulaOpacity }}
-        className="mt-6 rounded-lg bg-background/60 p-3 text-center font-mono text-[11px] text-muted-foreground sm:text-xs"
-      >
-        0.50×80 + 0.25×92 + 0.15×88 + 0.10×78 = <span className="text-foreground">{TOTAL.toFixed(0)}</span>
-      </motion.p>
-    </Panel>
-  );
-}
-
-function ScoreBar({ p, index, label, weight, value }: { p: MotionValue<number>; index: number; label: string; weight: number; value: number }) {
-  const start = 0.12 + index * 0.07;
-  const v = useTransform(p, [start, start + 0.35], [0, value]);
-  const width = useTransform(v, (x) => `${x}%`);
-  const text = useTransform(v, (x) => Math.round(x).toString());
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span>
-          {label} <span className="font-mono text-muted-foreground">×{weight.toFixed(2)}</span>
-        </span>
-        <motion.span className="font-mono">{text}</motion.span>
+      <div className="flex flex-col gap-4">
+        {BARS.map((b, i) => <ScoreBar key={b.label} p={p} i={i} {...b} />)}
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-secondary">
-        <motion.div style={{ width }} className="h-full rounded-full bg-primary" />
+      <div className="flex flex-col gap-3">
+        <motion.div style={{ opacity: qO, y: qY }} className="rounded-xl bg-primary/10 p-4 text-[15px] italic leading-relaxed">
+          “Built REST services in <mark className="rounded bg-matched/30 px-1 not-italic text-foreground">Django</mark> backed by Postgres.”
+        </motion.div>
+        <motion.div style={{ opacity: bO, y: bY }} className="flex flex-wrap gap-2">
+          <Chip tone="missing">Docker: no evidence found</Chip>
+          <Chip tone="absent">Kubernetes: confirmed absent</Chip>
+        </motion.div>
+        <motion.p style={{ opacity: bO }} className="font-mono text-[11px] text-muted-foreground">0.50×80 + 0.25×92 + 0.15×88 + 0.10×78 = 84</motion.p>
       </div>
     </div>
   );
 }
 
-// =============================================================== 05 Fairness
-const IDENTITY = [
-  { label: "Name", value: "Sara Ahmed" },
-  { label: "Email", value: "sara.ahmed@example.com" },
-  { label: "Address", value: "Gulberg, Lahore" },
-  { label: "Date of birth", value: "12 Mar 1997" },
-  { label: "Gender", value: "Female" },
-];
+function ScoreBar({ p, i, label, w, v }: { p: MotionValue<number>; i: number; label: string; w: number; v: number }) {
+  const width = useTransform(p, [i * 0.1, 0.45 + i * 0.1], ["0%", `${v}%`]);
+  return (
+    <div className="text-[15px]">
+      <div className="mb-1.5 flex justify-between"><span>{label} <span className="text-muted-foreground">{w * 100}%</span></span><span className="font-mono">{v}</span></div>
+      <Bar value={width} />
+    </div>
+  );
+}
+
+// =============================================================== 5 Kanban: AI suggests, you decide
+const COLS = ["Review", "Shortlisted", "Interview", "Selected"];
+const CARDS = [{ n: "Sara Ahmed", s: 84 }, { n: "Bilal K.", s: 63 }, { n: "Hina R.", s: 31 }];
+
+export function KanbanScene() {
+  return (
+    <Scene id="kanban" length={260}>
+      {(p) => (
+        <>
+          <SceneCopy title="AI suggests. You decide.">Nothing moves forward until a recruiter says so — and every move is written to the audit trail.</SceneCopy>
+          <KanbanVisual p={p} />
+        </>
+      )}
+    </Scene>
+  );
+}
+
+function KanbanVisual({ p }: { p: MotionValue<number> }) {
+  const c1 = useRef<HTMLDivElement>(null);
+  const c2 = useRef<HTMLDivElement>(null);
+  const step = useRef(0);
+  useEffect(() => {
+    const measure = () => { if (c1.current && c2.current) step.current = c2.current.offsetLeft - c1.current.offsetLeft; };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const x = useTransform(p, (v) => {
+    const a = Math.min(1, Math.max(0, (v - 0.35) / 0.2));
+    const b = Math.min(1, Math.max(0, (v - 0.65) / 0.2));
+    return step.current * (a + b);
+  });
+  const y = useTransform(p, [0.35, 0.45, 0.85], [0, -14, -14]);
+  const btnO = useTransform(p, [0.2, 0.28, 0.5, 0.55], [0, 1, 1, 0]);
+  const btnS = useTransform(p, [0.2, 0.28], [0.6, 1]);
+  const auditO = useTransform(p, [0.55, 0.62], [0, 1]);
+  const auditText = useTransform(p, (v): string => (v < 0.75 ? "ai_assessed → shortlisted · by recruiter" : "shortlisted → interview · by recruiter"));
+
+  return (
+    <div className="w-full max-w-5xl">
+      <div className="grid grid-cols-2 gap-4 text-left md:grid-cols-4">
+        {COLS.map((c, i) => (
+          <KanbanCol key={c} p={p} i={i} title={c} innerRef={i === 0 ? c1 : i === 1 ? c2 : undefined}>
+            {i === 0 &&
+              CARDS.map((card, j) => (
+                <motion.div
+                  key={card.n}
+                  style={j === 0 ? { x, y } : undefined}
+                  className={cn(
+                    "relative mb-2.5 rounded-xl border bg-background/70 p-3 text-sm",
+                    j === 0 ? "z-10 border-matched shadow-[0_0_30px_-8px_rgba(45,212,191,0.6)]" : "border-border",
+                  )}
+                >
+                  <b>{card.n}</b>
+                  <br />
+                  <span className="text-muted-foreground">{card.s}% match · AI suggestion</span>
+                </motion.div>
+              ))}
+          </KanbanCol>
+        ))}
+      </div>
+      <motion.div style={{ opacity: btnO, scale: btnS }} className="mt-6">
+        <span className="inline-flex animate-[pulse-ring_1.4s_infinite] rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground">
+          Shortlist Sara
+        </span>
+      </motion.div>
+      <motion.p style={{ opacity: auditO }} className="mt-4 font-mono text-xs text-muted-foreground">
+        audit trail: <motion.span className="text-matched">{auditText}</motion.span> · AI status changes: 0
+      </motion.p>
+    </div>
+  );
+}
+
+function KanbanCol({ p, i, title, innerRef, children }: { p: MotionValue<number>; i: number; title: string; innerRef?: React.Ref<HTMLDivElement>; children?: ReactNode }) {
+  const opacity = useTransform(p, [i * 0.04, 0.14 + i * 0.04], [0, 1]);
+  const y = useTransform(p, [i * 0.04, 0.14 + i * 0.04], [40, 0]);
+  return (
+    <motion.div ref={innerRef} style={{ opacity, y, zIndex: i === 0 ? 20 : 1 }} className="relative min-h-[220px] rounded-2xl border border-border bg-surface p-3.5">
+      <h5 className="mb-3 text-sm text-muted-foreground">{title}</h5>
+      {children}
+    </motion.div>
+  );
+}
+
+// =============================================================== 6 Fairness: hide identity, score stays
+const PII = [["Name", "Sara Ahmed"], ["Gender", "Female"], ["Age", "27"], ["Address", "Gulberg, Lahore"]];
 
 export function FairnessScene() {
   return (
-    <Scene id="fairness" length={220}>
+    <Scene id="fair" length={230}>
       {(p) => (
         <>
-          <SceneCopy step="05" eyebrow="Fairness" title={<>Scored on skills, <span className="text-matched">not identity.</span></>}>
-            Name, contact details, address, gender, age, religion, marital status and nationality are removed
-            before any scoring call. Change them and the score stays the same.
-          </SceneCopy>
-          <FairnessVisual p={p} />
+          <SceneCopy title="The score ignores who you are">Name, gender, age and address are stripped before any scoring call. The result stays the same.</SceneCopy>
+          <FairVisual p={p} />
         </>
       )}
     </Scene>
   );
 }
 
-function FairnessVisual({ p }: { p: MotionValue<number> }) {
-  const blur = useTransform(p, [0.12, 0.45], [0, 9]);
-  const filter = useMotionTemplate`blur(${blur}px)`;
-  const redactOpacity = useTransform(p, [0.4, 0.52], [0, 1]);
-  const sentOpacity = useTransform(p, [0.5, 0.62], [0, 1]);
-  const testOpacity = useTransform(p, [0.66, 0.8], [0, 1]);
-
+function FairVisual({ p }: { p: MotionValue<number> }) {
+  const tgBg = useTransform(p, [0.1, 0.25], [LINE, MATCHED]);
+  const knob = useTransform(p, [0.1, 0.25], [0, 28]);
+  const okS = useTransform(p, [0.65, 0.78], [0, 1]);
   return (
-    <Panel className="mx-auto w-full max-w-lg">
-      <div className="mb-4 flex items-center gap-3">
-        <motion.div style={{ filter }} className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary/60 to-matched/60">
-          <UserRound className="h-6 w-6 text-background" />
-        </motion.div>
-        <div className="text-sm">
-          <p className="font-heading font-semibold">Candidate profile</p>
-          <p className="text-xs text-muted-foreground">What the scoring model receives</p>
-        </div>
+    <div className="grid w-full max-w-4xl items-center gap-10 text-left md:grid-cols-2">
+      <div className="rounded-2xl border border-border bg-surface p-6">
+        {PII.map(([k, v], i) => <PiiRow key={k} p={p} i={i} k={k} v={v} />)}
+        <div className="flex justify-between pt-3 text-[15px]"><span className="text-muted-foreground">Skills &amp; projects</span><span className="text-matched">Used for scoring</span></div>
       </div>
-      <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm">
-        {IDENTITY.map((f) => (
-          <div key={f.label} className="contents">
-            <dt className="text-muted-foreground">{f.label}</dt>
-            <dd className="relative">
-              <motion.span style={{ filter }} className="inline-block">{f.value}</motion.span>
-              <motion.span style={{ opacity: redactOpacity }} className="absolute inset-y-0 left-0 flex items-center font-mono text-[11px] text-absent">
-                [redacted]
-              </motion.span>
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="relative mt-5 rounded-xl border border-border p-3">
-        <motion.div style={{ opacity: sentOpacity }} className="pointer-events-none absolute inset-0 rounded-xl border-2 border-matched shadow-[0_0_30px_-6px_rgba(45,212,191,0.6)]" />
-        <div className="mb-2 flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Skills &amp; evidence</span>
-          <motion.span style={{ opacity: sentOpacity }} className="flex items-center gap-1 text-matched">
-            <ShieldCheck className="h-3.5 w-3.5" /> sent to scoring
+      <div className="flex flex-col items-start gap-5">
+        <div className="flex items-center gap-3.5">
+          <motion.span style={{ backgroundColor: tgBg }} className="inline-block h-[34px] w-[62px] rounded-full p-1">
+            <motion.i style={{ x: knob }} className="block h-[26px] w-[26px] rounded-full bg-foreground" />
           </motion.span>
+          <b>Hide personal details</b>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {["Python", "Django", "PostgreSQL", "REST API", "4 yrs backend"].map((s) => (
-            <Chip key={s} tone="neutral">{s}</Chip>
-          ))}
-        </div>
+        <div className="font-heading text-6xl font-bold">84</div>
+        <motion.span style={{ scale: okS, opacity: okS }} className="origin-left">
+          <Chip tone="matched">Score unchanged · counterfactual test passed</Chip>
+        </motion.span>
       </div>
-      <motion.p style={{ opacity: testOpacity }} className="mt-4 font-mono text-[11px] text-muted-foreground sm:text-xs">
-        Counterfactual test: name + gender swapped → score <span className="text-foreground">84</span> →{" "}
-        <span className="text-matched">84</span>
-      </motion.p>
-    </Panel>
-  );
-}
-
-// =============================================================== 06 Decide
-const RANKED = [
-  { name: "Sara A.", score: 84, note: "4/4 skills · 3 verified excerpts", tone: "matched" as const },
-  { name: "Bilal K.", score: 63, note: "Docker: missing evidence", tone: "missing" as const },
-  { name: "Hina R.", score: 31, note: "Backend: explicitly lacking", tone: "absent" as const },
-];
-
-const TONE_TEXT = { matched: "text-matched", missing: "text-missing", absent: "text-absent" } as const;
-
-export function DecideScene() {
-  return (
-    <Scene id="decide" length={260}>
-      {(p) => (
-        <>
-          <SceneCopy step="06" eyebrow="Decide" title={<>AI recommends. <span className="text-primary">You decide.</span></>}>
-            RC3 never shortlists or rejects anyone on its own. Every status change is a recruiter action,
-            written to an audit trail with who made it, when, and why.
-          </SceneCopy>
-          <DecideVisual p={p} />
-        </>
-      )}
-    </Scene>
-  );
-}
-
-function DecideVisual({ p }: { p: MotionValue<number> }) {
-  const left = useTransform(p, [0.05, 0.45], ["calc(88% + 0px)", "calc(100% + -78px)"]);
-  const top = useTransform(p, [0.05, 0.45], ["calc(100% + 10px)", "calc(0% + 40px)"]);
-  const step = useStep(p, [0.5, 0.58, 0.7]);
-  const clicked = step >= 1;
-  const shortlisted = step >= 2;
-
-  return (
-    <div className="mx-auto w-full max-w-lg">
-      <div className="relative space-y-3">
-        {RANKED.map((c, i) => {
-          const isTop = i === 0;
-          return (
-            <motion.div
-              key={c.name}
-              initial={false}
-              animate={isTop && shortlisted ? { scale: 1.02 } : { scale: 1 }}
-              transition={spring}
-              className={cn(
-                "flex h-[84px] items-center justify-between gap-3 rounded-2xl border bg-surface px-4 transition-colors duration-500",
-                isTop && shortlisted ? "border-matched shadow-[0_0_40px_-10px_rgba(45,212,191,0.6)]" : "border-border",
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="w-10 font-heading text-2xl font-bold">{c.score}</span>
-                <div className="min-w-0">
-                  <p className="font-medium">{c.name}</p>
-                  <p className={cn("truncate text-xs", TONE_TEXT[c.tone])}>{c.note}</p>
-                </div>
-              </div>
-              {isTop ? (
-                <motion.span
-                  initial={false}
-                  animate={clicked && !shortlisted ? { scale: 0.92 } : { scale: 1 }}
-                  className={cn(
-                    "inline-flex h-9 w-[104px] shrink-0 items-center justify-center gap-1 rounded-lg text-sm font-medium transition-colors",
-                    shortlisted ? "bg-matched/20 text-matched" : "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {shortlisted ? (<><Check className="h-4 w-4" /> Shortlisted</>) : "Shortlist"}
-                </motion.span>
-              ) : (
-                <span className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground">Review</span>
-              )}
-            </motion.div>
-          );
-        })}
-
-        <motion.svg
-          aria-hidden
-          style={{ left, top }}
-          animate={clicked && !shortlisted ? { scale: 0.85 } : { scale: 1 }}
-          viewBox="0 0 24 24"
-          className="pointer-events-none absolute z-10 h-7 w-7 drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]"
-        >
-          <path d="M3 2l7.5 19 2.6-7.9L21 10.5z" fill="#E6E8F2" stroke="#0B0D17" strokeWidth="1.4" strokeLinejoin="round" />
-        </motion.svg>
-      </div>
-
-      <motion.div
-        initial={false}
-        animate={{ opacity: step >= 3 ? 1 : 0, y: step >= 3 ? 0 : 8 }}
-        className="mt-5 rounded-xl border border-border bg-background/60 p-3 font-mono text-[11px] sm:text-xs"
-      >
-        <p className="text-muted-foreground">audit trail</p>
-        <p className="mt-1">
-          <span className="text-muted-foreground">ai_assessed</span> → <span className="text-matched">shortlisted</span>{" "}
-          · by recruiter · just now
-        </p>
-        <p className="mt-1 text-muted-foreground">statuses changed by AI: 0</p>
-      </motion.div>
     </div>
   );
 }
 
-// =============================================================== 07 Search
-const SEARCH_QUERY = "Python developers with REST API experience";
+function PiiRow({ p, i, k, v }: { p: MotionValue<number>; i: number; k: string; v: string }) {
+  const r = [0.3 + i * 0.07, 0.42 + i * 0.07];
+  const blur = useTransform(p, r, [0, 9]);
+  const filter = useMotionTemplate`blur(${blur}px)`;
+  const opacity = useTransform(p, r, [1, 0.45]);
+  return (
+    <div className="flex justify-between border-b border-border py-2.5 text-[15px]">
+      <span className="text-muted-foreground">{k}</span>
+      <motion.span style={{ filter, opacity }}>{v}</motion.span>
+    </div>
+  );
+}
+
+// =============================================================== 7 Search
+const QUERY = "Python developers with REST API experience";
 const RESULTS = [
-  { name: "Sara A.", sim: 0.89, parts: ["Built ", "REST services", " in ", "Django", " backed by PostgreSQL."], note: null },
-  { name: "Bilal K.", sim: 0.81, parts: ["Designed ", "Flask endpoints", " consumed by the mobile app."], note: "different wording, same skill" },
-  { name: "Usman T.", sim: 0.74, parts: ["", "Python", " automation for ", "API", " integration tests."], note: null },
+  { n: "Sara Ahmed", sim: 89, parts: ["Built ", "REST services", " in ", "Django", " backed by Postgres."] },
+  { n: "Bilal K.", sim: 81, parts: ["Designed ", "Flask endpoints", " for the mobile app."] },
+  { n: "Usman T.", sim: 74, parts: ["", "Python", " automation for ", "API", " integration tests."] },
 ];
 
 export function SearchScene() {
   return (
-    <Scene id="search" length={240}>
+    <Scene id="search" length={230}>
       {(p) => (
         <>
-          <SceneCopy step="07" eyebrow="Search" title="Ask for talent in plain language.">
-            Resume passages are stored as embeddings in pgvector, so a search for &ldquo;REST API&rdquo; also
-            finds &ldquo;Flask endpoints&rdquo;, and each result comes with its evidence.
-          </SceneCopy>
+          <SceneCopy title="Ask for talent in plain language">Semantic search over resume passages finds “Flask endpoints” when you ask for “REST API”.</SceneCopy>
           <SearchVisual p={p} />
         </>
       )}
@@ -777,128 +524,159 @@ export function SearchScene() {
 }
 
 function SearchVisual({ p }: { p: MotionValue<number> }) {
-  const chars = useTransform(p, [0.05, 0.4], [0, SEARCH_QUERY.length]);
-  const typed = useTransform(chars, (v) => SEARCH_QUERY.slice(0, Math.round(v)));
-  const shown = useStep(p, [0.48, 0.58, 0.68]);
-  const searching = useStep(p, [0.41]) > 0 && shown === 0;
-
+  const typed = useTransform(p, (v) => QUERY.slice(0, Math.round(Math.min(1, Math.max(0, v / 0.4)) * QUERY.length)));
   return (
-    <div className="mx-auto w-full max-w-lg space-y-3">
-      <Panel className="flex items-center gap-3 !p-4">
-        <Search className="h-5 w-5 shrink-0 text-primary" />
-        <p className="min-h-[1.5em] flex-1 text-sm sm:text-base">
-          <motion.span>{typed}</motion.span>
-          <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] animate-pulse bg-primary motion-reduce:animate-none" />
-        </p>
-        <span className="hidden font-mono text-[10px] text-muted-foreground sm:block">{searching ? "embedding…" : "⏎"}</span>
-      </Panel>
-      <div className="min-h-[260px] space-y-3">
-        <AnimatePresence>
-          {RESULTS.slice(0, shown).map((r) => (
-            <motion.div
-              key={r.name}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={spring}
-              className="rounded-2xl border border-border bg-surface p-4"
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="font-medium">{r.name}</p>
-                <span className="font-mono text-xs text-matched">{Math.round(r.sim * 100)}% match</span>
-              </div>
-              <p className="font-mono text-[11px] leading-relaxed text-foreground/80 sm:text-xs">
-                “
-                {r.parts.map((t, i) =>
-                  i % 2 === 1 ? (
-                    <mark key={i} className="rounded bg-matched/20 px-0.5 text-matched">{t}</mark>
-                  ) : (
-                    <span key={i}>{t}</span>
-                  ),
-                )}
-                ”
-              </p>
-              {r.note && <Chip tone="primary" className="mt-2 !text-[11px]">{r.note}</Chip>}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+    <div className="w-full max-w-2xl space-y-3 text-left">
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4">
+        <Search className="h-5 w-5 text-primary" />
+        <motion.span className="flex-1">{typed}</motion.span>
+        <span className="h-5 w-0.5 animate-pulse bg-primary" />
       </div>
+      {RESULTS.map((r, i) => <SearchResult key={r.n} p={p} i={i} {...r} />)}
     </div>
   );
 }
 
-// =============================================================== CTA
-export function CtaButtons({ size = "lg" }: { size?: "lg" | "default" }) {
+function SearchResult({ p, i, n, sim, parts }: { p: MotionValue<number>; i: number; n: string; sim: number; parts: string[] }) {
+  const rg = [0.45 + i * 0.1, 0.55 + i * 0.1];
+  const opacity = useTransform(p, rg, [0, 1]);
+  const y = useTransform(p, rg, [20, 0]);
   return (
-    <div className="flex flex-wrap gap-3">
-      <Button asChild size={size}>
-        <Link href="/auth/sign-up?role=recruiter">
-          <BriefcaseBusiness className="h-4 w-4" /> I&apos;m hiring
-        </Link>
-      </Button>
-      <Button asChild size={size} variant="outline">
-        <Link href="/auth/sign-up?role=candidate">
-          <FileText className="h-4 w-4" /> I&apos;m a candidate
-        </Link>
-      </Button>
-    </div>
+    <motion.div style={{ opacity, y }} className="rounded-2xl border border-border bg-surface p-4">
+      <div className="mb-1.5 flex justify-between"><b>{n}</b><span className="font-mono text-xs text-matched">{sim}% match</span></div>
+      <p className="font-mono text-xs text-foreground/80">
+        “{parts.map((t, j) => (j % 2 ? <mark key={j} className="rounded bg-matched/25 px-0.5 text-matched">{t}</mark> : <span key={j}>{t}</span>))}”
+      </p>
+    </motion.div>
   );
 }
 
-export function FinalCta() {
+// =============================================================== 8 Analytics: counters + charts draw
+const STATS = [{ n: 3, l: "Active jobs" }, { n: 48, l: "Applications" }, { n: 9, l: "Shortlisted" }, { n: 2.4, l: "Days to decision", d: 1 }];
+const JOB_BARS = [100, 72, 55, 38, 26];
+
+export function AnalyticsSection() {
+  const ref = useRef<HTMLElement>(null);
+  const reduced = useReduced();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "center center"] });
+  const one = useMotionValue(1);
+  const q = reduced ? one : scrollYProgress;
+  const line = useTransform(q, [0.3, 1], [0, 1]);
   return (
-    <section className="relative overflow-hidden py-24 sm:py-32">
-      <Glow />
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 className="text-center text-4xl font-bold sm:text-6xl">Follow the evidence.</h2>
-        <p className="mx-auto mt-4 max-w-xl text-center text-muted-foreground">
-          Hiring with AI is safer when the evidence is visible and the decision stays with a person.
-        </p>
-        <div className="mt-12 grid gap-4 md:grid-cols-2">
-          <RoleCard
-            href="/auth/sign-up?role=recruiter"
-            icon={<BriefcaseBusiness className="h-5 w-5" />}
-            title="I'm hiring"
-            body="Paste a job description and let AI pull out the requirements. Then review a ranked list of candidates, each with excerpts, gaps and a score breakdown."
-            cta="Start as a recruiter"
-            primary
-          />
-          <RoleCard
-            href="/auth/sign-up?role=candidate"
-            icon={<FileText className="h-5 w-5" />}
-            title="I'm a candidate"
-            body="Upload a PDF, fix anything the AI got wrong, and track every application from submitted to decision."
-            cta="Start as a candidate"
-          />
+    <section ref={ref} id="ana" className="flex min-h-screen flex-col items-center justify-center px-4 py-24 text-center sm:px-6">
+      <SceneCopy title="See the whole pipeline at a glance" />
+      <div className="grid w-full max-w-5xl grid-cols-2 gap-4 md:grid-cols-4">
+        {STATS.map((s) => <Stat key={s.l} q={q} {...s} />)}
+      </div>
+      <div className="mt-4 grid w-full max-w-5xl gap-4 text-left md:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-surface p-5">
+          <b>Applications by job</b>
+          <div className="mt-4 flex h-[150px] items-end gap-3.5 px-3.5">
+            {JOB_BARS.map((h, i) => <JobBar key={i} q={q} i={i} h={h} />)}
+          </div>
         </div>
-        <p className="mt-8 text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary underline-offset-4 hover:underline">
-            Sign in
-          </Link>
-        </p>
+        <div className="rounded-2xl border border-border bg-surface p-5">
+          <b>Shortlist rate over time</b>
+          <svg viewBox="0 0 200 100" preserveAspectRatio="none" className="mt-3 h-[150px] w-full">
+            <motion.polyline points="0,85 30,70 60,76 90,50 120,56 150,30 200,18" fill="none" stroke={MATCHED} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{ pathLength: line }} />
+          </svg>
+        </div>
       </div>
     </section>
   );
 }
 
-function RoleCard({ href, icon, title, body, cta, primary }: { href: string; icon: React.ReactNode; title: string; body: string; cta: string; primary?: boolean }) {
+function Stat({ q, n, l, d = 0 }: { q: MotionValue<number>; n: number; l: string; d?: number }) {
+  const v = useTransform(q, [0, 0.6], [0, n]);
+  const text = useTransform(v, (x) => x.toFixed(d));
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group rounded-2xl border bg-surface p-6 transition-colors sm:p-8",
-        primary ? "border-primary/50 hover:border-primary" : "border-border hover:border-foreground/40",
-      )}
+    <div className="rounded-2xl border border-border bg-surface p-5 text-left">
+      <motion.b className="block font-heading text-4xl">{text}</motion.b>
+      <span className="text-sm text-muted-foreground">{l}</span>
+    </div>
+  );
+}
+
+function JobBar({ q, i, h }: { q: MotionValue<number>; i: number; h: number }) {
+  const scaleY = useTransform(q, [0.2 + i * 0.08, 0.6 + i * 0.08], [0, 1]);
+  return <motion.i style={{ scaleY, height: `${h}%` }} className="block flex-1 origin-bottom rounded-t-md bg-gradient-to-t from-primary to-matched" />;
+}
+
+// =============================================================== 9 CTA: drifting gradient
+export function FinalCta() {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end end"] });
+  const pos = useTransform(scrollYProgress, [0, 1], ["0% 0%", "100% 100%"]);
+  return (
+    <motion.section
+      ref={ref}
+      id="cta"
+      style={{
+        backgroundPosition: pos,
+        backgroundSize: "300% 300%",
+        backgroundImage: "linear-gradient(120deg,#0B0D17,#2a1f66,#0B0D17,#0f3a3a)",
+      }}
+      className="flex min-h-[80vh] flex-col items-center justify-center px-4 text-center"
     >
-      <span className={cn("mb-5 inline-flex h-10 w-10 items-center justify-center rounded-xl", primary ? "bg-primary text-primary-foreground" : "bg-secondary")}>
-        {icon}
-      </span>
-      <h3 className="text-2xl font-bold">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-      <span className={cn("mt-6 inline-flex items-center gap-1.5 text-sm font-medium", primary ? "text-primary" : "text-foreground")}>
-        {cta} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-      </span>
-    </Link>
+      <SceneCopy title="Ready to hire with proof?">Pick your side. Both start in under a minute.</SceneCopy>
+      <CtaButtons />
+      <p className="mt-8 text-sm text-muted-foreground">
+        Already have an account? <Link href="/auth/login" className="text-primary hover:underline">Sign in</Link>
+      </p>
+    </motion.section>
+  );
+}
+
+// =============================================================== global effects
+/** Soft spotlight that follows the cursor. */
+export function Spotlight() {
+  const x = useSpring(-500, { stiffness: 120, damping: 20 });
+  const y = useSpring(-500, { stiffness: 120, damping: 20 });
+  useEffect(() => {
+    const move = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
+    window.addEventListener("mousemove", move);
+    return () => window.removeEventListener("mousemove", move);
+  }, [x, y]);
+  return (
+    <motion.div
+      aria-hidden
+      style={{ x, y }}
+      className="pointer-events-none fixed left-0 top-0 z-[1] -ml-[210px] -mt-[210px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(124,92,255,0.14),transparent_65%)]"
+    />
+  );
+}
+
+const RAIL = [
+  { id: "hero", label: "Submitted" }, { id: "parse", label: "Parsed" }, { id: "match", label: "AI assessment" },
+  { id: "score", label: "Recruiter review" }, { id: "kanban", label: "Shortlisted" }, { id: "fair", label: "Interview" },
+  { id: "ana", label: "Selected" },
+];
+
+/** Pipeline-stage rail: highlights the stage matching the section in view. */
+export function StageRail() {
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const mid = window.innerHeight * 0.55;
+      let idx = 0;
+      RAIL.forEach((r, i) => {
+        const el = document.getElementById(r.id);
+        if (el && el.getBoundingClientRect().top <= mid) idx = i;
+      });
+      setActive(idx);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <ul aria-hidden className="fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 flex-col gap-3.5 text-xs text-muted-foreground lg:flex">
+      {RAIL.map((r, i) => (
+        <li key={r.id} className={cn("flex items-center justify-end gap-2 transition-colors duration-300", i === active && "text-matched")}>
+          <span>{r.label}</span>
+          <i className={cn("block h-2.5 w-2.5 rounded-full transition-all duration-300", i === active ? "bg-matched shadow-[0_0_12px_#2DD4BF]" : i < active ? "bg-primary/60" : "bg-border")} />
+        </li>
+      ))}
+    </ul>
   );
 }

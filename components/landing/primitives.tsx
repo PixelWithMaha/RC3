@@ -2,6 +2,7 @@
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
+  motion,
   useMotionValue,
   useMotionValueEvent,
   useScroll,
@@ -27,7 +28,7 @@ export function useReduced(): boolean {
 
 // ---------------------------------------------------------------- scroll scene
 /**
- * A tall section whose content is pinned while you scroll through it.
+ * A tall section whose content is pinned while you scroll through it (scrubbed animation).
  * Children receive scroll progress (0→1). With reduced motion the section is
  * normal height and progress is fixed at 1, so every scene shows its final state.
  */
@@ -46,24 +47,46 @@ export function Scene({
   const done = useMotionValue(1);
 
   return (
-    <section
-      id={id}
-      ref={ref}
-      className="relative"
-      style={{ height: reduced ? undefined : `${length}vh` }}
-    >
-      <div
-        className={
-          reduced
-            ? "py-16 sm:py-24"
-            : "sticky top-0 flex h-[100svh] items-start overflow-hidden lg:items-center"
-        }
-      >
-        <div className="mx-auto grid w-full max-w-6xl items-center gap-5 px-4 pt-[72px] sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16 lg:pt-14">
+    <section id={id} ref={ref} className="relative" style={{ height: reduced ? undefined : `${length}vh` }}>
+      <div className={reduced ? "py-20" : "sticky top-0 flex h-[100svh] items-center overflow-hidden"}>
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pt-16 text-center sm:px-6">
           {children(reduced ? done : scrollYProgress)}
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Word-by-word heading reveal: each word rises out of its own mask.
+ * The in-view trigger sits on the (visible) heading; words follow via variants —
+ * a word hidden inside its mask would never register as in view itself.
+ */
+export function Reveal({ text, as = "h2", className, delay = 0 }: { text: string; as?: "h1" | "h2"; className?: string; delay?: number }) {
+  const Tag = as === "h1" ? motion.h1 : motion.h2;
+  const words = text.split(" ");
+  return (
+    <Tag
+      aria-label={text}
+      className={className}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ staggerChildren: 0.07, delayChildren: delay }}
+    >
+      {words.map((w, i) => (
+        <span key={i} aria-hidden className="inline-block overflow-hidden pb-[0.08em] align-top">
+          <motion.span
+            className="inline-block"
+            variants={{ hidden: { y: "115%" }, show: { y: "0%" } }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {w}
+          </motion.span>
+          {i < words.length - 1 && "\u00a0"}
+        </span>
+      ))}
+    </Tag>
   );
 }
 
@@ -78,30 +101,11 @@ export function useStep(progress: MotionValue<number>, thresholds: number[]): nu
   return step;
 }
 
-export function SceneCopy({
-  step,
-  eyebrow,
-  title,
-  children,
-}: {
-  step: string;
-  eyebrow: string;
-  title: ReactNode;
-  children?: ReactNode;
-}) {
+export function SceneCopy({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="max-w-xl">
-      <p className="mb-3 flex items-center gap-3 font-mono text-xs uppercase tracking-[0.2em] text-primary">
-        <span className="rounded-md border border-primary/40 px-1.5 py-0.5">{step}</span>
-        {eyebrow}
-      </p>
-      <h2 className="text-3xl font-bold leading-[1.05] sm:text-4xl lg:text-5xl">{title}</h2>
-      {children && (
-        // On short phones the pinned scene can't fit copy + visual, so the body text gives way.
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground max-lg:[@media(max-height:740px)]:hidden sm:mt-4 sm:text-base">
-          {children}
-        </p>
-      )}
+    <div className="mb-8 max-w-3xl">
+      <Reveal text={title} className="text-3xl font-bold leading-[1.08] sm:text-4xl lg:text-5xl" />
+      {children && <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground sm:text-lg">{children}</p>}
     </div>
   );
 }

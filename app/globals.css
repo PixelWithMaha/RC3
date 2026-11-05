@@ -52,3 +52,11 @@
     @apply font-heading tracking-tight;
   }
 }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.55); }
+  100% { box-shadow: 0 0 0 18px rgba(124, 92, 255, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[pulse-ring_1\.4s_infinite\] { animation: none; }
+}

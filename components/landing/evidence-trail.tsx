@@ -7,15 +7,17 @@ import "lenis/dist/lenis.css";
 import { Button } from "@/components/ui/button";
 import { useReduced } from "./primitives";
 import {
-  DecideScene,
-  ExtractScene,
+  AnalyticsSection,
   FairnessScene,
   FinalCta,
   Hero,
+  KanbanScene,
   MatchScene,
+  ParseScene,
   ScoreScene,
   SearchScene,
-  UploadScene,
+  Spotlight,
+  StageRail,
 } from "./scenes";
 
 export function EvidenceTrail() {
@@ -23,16 +25,18 @@ export function EvidenceTrail() {
   const page = (
     <MotionConfig reducedMotion="user">
       <ProgressRail />
+      {!reduced && <Spotlight />}
       <Nav />
-      <main className="overflow-x-clip">
+      <StageRail />
+      <main className="relative z-[2] overflow-x-clip">
         <Hero />
-        <UploadScene />
-        <ExtractScene />
+        <ParseScene />
         <MatchScene />
         <ScoreScene />
+        <KanbanScene />
         <FairnessScene />
-        <DecideScene />
         <SearchScene />
+        <AnalyticsSection />
         <FinalCta />
       </main>
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
