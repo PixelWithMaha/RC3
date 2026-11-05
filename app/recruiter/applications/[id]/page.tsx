@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { getApplication, getJob, getResumeFileUrl, rescoreApplication } from "@/lib/api";
 import { Avatar, ScoreRing } from "@/components/app/kit";
+import { ProfileLinks } from "@/components/app/links";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/app/badges";
@@ -37,6 +38,7 @@ export default function ApplicationDetail() {
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {app.job_title} · applied {new Date(app.created_at).toLocaleDateString()} · <StatusBadge status={app.status} />
             </p>
+            <ProfileLinks className="mt-3" links={app.resume?.parsed?.contact.links} email={app.resume?.parsed?.contact.email ?? app.candidate_email} />
           </div>
           <ScoreRing value={app.effective_score} size={84} label={app.override_score != null ? "override" : "relevance"} />
           {app.resume && (

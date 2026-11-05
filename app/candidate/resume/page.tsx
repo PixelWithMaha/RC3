@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState, Loading, useAsync } from "@/components/app/states";
 import { cn } from "@/lib/utils";
+import { normalizeLink, profileLinks } from "@/lib/links";
+import { ProfileLinks } from "@/components/app/links";
 
 const delay = (i: number) => ({ animationDelay: `${Math.min(i * 45, 1300)}ms` });
 const STEPS = ["Resume uploaded", "Text extracted", "Skills normalised", "Evidence linked"];
@@ -236,6 +238,11 @@ function Editor({ resume, onSaved }: { resume: Resume; onSaved: (r: Resume) => v
             <p className="truncate text-sm text-muted-foreground">
               {[parsed.contact.email, parsed.contact.phone, parsed.contact.location, parsed.total_experience_years != null && `${parsed.total_experience_years} years experience`].filter(Boolean).join(" · ")}
             </p>
+            <LinksEditor
+              links={parsed.contact.links}
+              onChange={(links) => update({ ...parsed, contact: { ...parsed.contact, links } })}
+              onError={(msg) => show({ msg, error: true })}
+            />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2.5">
@@ -424,6 +431,49 @@ function Entry({ i, title, meta, verified, body, skills, timeline }: { i: number
         <div className="mt-2 flex flex-wrap gap-1.5">
           {skills.map((s) => <span key={s} className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs text-primary">{s}</span>)}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** RES-6: candidates can add, fix or remove LinkedIn / GitHub / portfolio links (only valid http(s) URLs). */
+function LinksEditor({ links, onChange, onError }: { links: string[]; onChange: (l: string[]) => void; onError: (m: string) => void }) {
+  const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const items = profileLinks(links);
+  const add = () => {
+    const url = normalizeLink(draft);
+    if (!url) return onError("That doesn't look like a valid web link (e.g. linkedin.com/in/your-name).");
+    if (items.some((i) => i.url.toLowerCase() === url.toLowerCase())) return onError("That link is already listed.");
+    onChange([...links, url]);
+    setDraft("");
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <ProfileLinks links={links} />
+      {open ? (
+        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); add(); }}>
+          <Input autoFocus className="h-7 w-56 text-xs" placeholder="linkedin.com/in/your-name" value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Profile link" />
+          <Button size="sm" className="h-7 px-2 text-xs" type="submit">Add</Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" type="button" onClick={() => setOpen(false)}>Cancel</Button>
+        </form>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary">
+          + {items.length ? "Add link" : "Add LinkedIn / GitHub"}
+        </button>
+      )}
+      {items.length > 0 && (
+        <details className="w-full text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Edit links</summary>
+          <ul className="mt-1 space-y-1">
+            {items.map((l) => (
+              <li key={l.url} className="flex items-center gap-2">
+                <span className="truncate font-mono">{l.url}</span>
+                <button type="button" className="text-absent hover:underline" onClick={() => onChange(links.filter((x) => normalizeLink(x) !== l.url))}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

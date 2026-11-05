@@ -12,6 +12,7 @@ import { join } from "node:path";
 export const RESUMES = {
   "strong-ayesha-khan.pdf": [
     "Ayesha Khan | ayesha.khan@example.com | +92 300 1110001 | Karachi",
+    "linkedin.com/in/rc3-demo-ayesha | github.com/rc3-demo-ayesha | ayesha.example.com",
     "Summary: Backend engineer with 5 years of experience building Python web services.",
     "Skills: Python, Django, Django REST Framework, PostgreSQL, Docker, Redis, Celery, Git",
     "",
@@ -32,6 +33,7 @@ export const RESUMES = {
   ],
   "partial-bilal-ahmed.pdf": [
     "Bilal Ahmed | bilal.ahmed@example.com | +92 321 2220002 | Lahore",
+    "linkedin.com/in/rc3-demo-bilal | github.com/rc3-demo-bilal",
     "Summary: Python developer with 3 years of experience in web APIs.",
     "Skills: Python, Flask, MySQL, REST APIs, Git, Linux",
     "",
@@ -50,6 +52,7 @@ export const RESUMES = {
   ],
   "weak-hina-raza.pdf": [
     "Hina Raza | hina.raza@example.com | +92 333 3330003 | Islamabad",
+    "linkedin.com/in/rc3-demo-hina | hina.example.com",
     "Summary: Frontend developer focused on React interfaces. No backend experience yet.",
     "Skills: JavaScript, React, HTML, CSS, Tailwind CSS, Figma",
     "",
@@ -66,6 +69,7 @@ export const RESUMES = {
   ],
   "frontend-zara-malik.pdf": [
     "Zara Malik | zara.malik@example.com | +92 300 4440004 | Lahore",
+    "linkedin.com/in/rc3-demo-zara | github.com/rc3-demo-zara | zara.example.com",
     "Summary: Frontend engineer with 4 years building fast, accessible web apps.",
     "Skills: TypeScript, JavaScript, React, Next.js, Tailwind CSS, Jest, Testing Library, Figma",
     "",
@@ -83,6 +87,7 @@ export const RESUMES = {
   ],
   "data-omar-farooq.pdf": [
     "Omar Farooq | omar.farooq@example.com | +92 301 5550005 | Karachi",
+    "linkedin.com/in/rc3-demo-omar",
     "Summary: Data analyst with 3 years turning messy data into business decisions.",
     "Skills: Python, SQL, Pandas, Tableau, Excel, Statistics, PostgreSQL",
     "",
@@ -100,6 +105,7 @@ export const RESUMES = {
   ],
   "devops-usman-tariq.pdf": [
     "Usman Tariq | usman.tariq@example.com | +92 322 6660006 | Islamabad",
+    "linkedin.com/in/rc3-demo-usman | github.com/rc3-demo-usman",
     "Summary: DevOps engineer with 4 years automating infrastructure and deployments.",
     "Skills: Docker, Kubernetes, AWS, Terraform, CI/CD, GitHub Actions, Linux, Python",
     "",
@@ -325,6 +331,27 @@ async function all() {
   console.log("\nDone. Sign in as recruiter@rc3.demo or talent@rc3.demo (password = DEMO_PASSWORD).");
 }
 
+/** Re-upload each demo PDF over the candidate's existing resume file and run the real parser again. */
+async function reparse() {
+  const E = env();
+  const { createClient } = await import("@supabase/supabase-js");
+  const { readFileSync } = await import("node:fs");
+  for (const c of CANDIDATES) {
+    const anon = createClient(E.url, E.anon, { auth: { persistSession: false } });
+    const { data, error } = await anon.auth.signInWithPassword({ email: c.email, password: E.password });
+    if (error) { console.log(`• ${c.email}: ${error.message}`); continue; }
+    const token = data.session.access_token;
+    const db = createClient(E.url, E.anon, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data: r } = await db.from("resumes").select("id, file_path").eq("candidate_id", data.user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!r) { console.log(`• ${c.email}: no resume yet (run seed:all)`); continue; }
+    const up = await db.storage.from("resumes").upload(r.file_path, readFileSync(new URL(`../public/demo/${c.pdf}`, import.meta.url)), { contentType: "application/pdf", upsert: true });
+    if (up.error) { console.log(`• ${c.email}: upload failed ${up.error.message}`); continue; }
+    const res = await fetch(E.base + "/api/resume/parse", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ resumeId: r.id }) });
+    const j = await res.json().catch(() => ({}));
+    console.log(res.ok ? `✓ ${c.email}: ${j.parsed?.skills?.length ?? 0} skills, ${j.parsed?.contact?.links?.length ?? 0} links` : `• ${c.email}: ${res.status} ${j.error ?? ""}`);
+  }
+}
+
 const cmd = process.argv[2];
 if (cmd === "pdfs") {
   for (const [name, lines] of Object.entries(RESUMES)) {
@@ -335,6 +362,8 @@ if (cmd === "pdfs") {
   await accounts();
 } else if (cmd === "all") {
   await all();
+} else if (cmd === "reparse") {
+  await reparse();
 } else {
-  console.log("Usage: node scripts/seed-demo.mjs pdfs | accounts | all");
+  console.log("Usage: node scripts/seed-demo.mjs pdfs | accounts | all | reparse");
 }

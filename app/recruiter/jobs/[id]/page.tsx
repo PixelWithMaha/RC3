@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge, statusLabel } from "@/components/app/badges";
 import { Avatar, Hero, ScoreRing, Skeleton, stagger } from "@/components/app/kit";
+import { ProfileLinks } from "@/components/app/links";
 import { Empty, ErrorState, Loading, useAsync } from "@/components/app/states";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +88,7 @@ export default function JobApplicants() {
                   )}
                 </div>
               </Link>
+              <ProfileLinks links={a.links} compact />
               <StatusBadge status={a.status} />
             </div>
           );

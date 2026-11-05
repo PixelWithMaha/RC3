@@ -9,10 +9,11 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 775 >>
+<< /Length 842 >>
 stream
 BT /F1 11 Tf 50 790 Td 16 TL
 (Usman Tariq | usman.tariq@example.com | +92 322 6660006 | Islamabad) Tj T*
+(linkedin.com/in/rc3-demo-usman | github.com/rc3-demo-usman) Tj T*
 (Summary: DevOps engineer with 4 years automating infrastructure and deployments.) Tj T*
 (Skills: Docker, Kubernetes, AWS, Terraform, CI/CD, GitHub Actions, Linux, Python) Tj T*
 () Tj T*
@@ -40,9 +41,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000001067 00000 n 
+0000001134 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1137
+1204
 %%EOF

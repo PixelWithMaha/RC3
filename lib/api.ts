@@ -235,7 +235,7 @@ export interface ApplicantFilters {
 }
 
 /** MATCH-4/5: ranked applicants for a job (effective score = override ?? AI score). */
-export async function getJobApplicants(jobId: string, f: ApplicantFilters = {}): Promise<RankedApplication[]> {
+export async function getJobApplicants(jobId: string, f: ApplicantFilters = {}): Promise<(RankedApplication & { links?: string[] })[]> {
   let q = createClient().from("applications_ranked").select("*").eq("job_id", jobId);
   if (f.status) q = q.eq("status", f.status);
   if (f.minScore != null) q = q.gte("effective_score", f.minScore);
@@ -244,7 +244,14 @@ export async function getJobApplicants(jobId: string, f: ApplicantFilters = {}):
     : q.order("effective_score", { ascending: false, nullsFirst: false });
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  let rows = (data ?? []) as RankedApplication[];
+  let rows = (data ?? []) as (RankedApplication & { links?: string[] })[];
+  // Profile links (LinkedIn/GitHub/portfolio) parsed from each resume, for quick access.
+  const resumeIds = [...new Set(rows.map((r) => r.resume_id))];
+  if (resumeIds.length) {
+    const { data: rs } = await createClient().from("resumes").select("id, contact:parsed->contact").in("id", resumeIds);
+    const byId = new Map((rs ?? []).map((r) => [r.id as string, ((r.contact as { links?: string[] } | null)?.links ?? []) as string[]]));
+    rows = rows.map((r) => ({ ...r, links: byId.get(r.resume_id) ?? [] }));
+  }
   if (f.skill) {
     const k = f.skill.toLowerCase();
     rows = rows.filter((r) => r.ai_explanation?.matched.some((m) => m.skill.toLowerCase() === k));

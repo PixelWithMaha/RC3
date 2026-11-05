@@ -8,6 +8,7 @@ import { WEIGHTS } from "@/lib/ai/scoring";
 import type { RankedApplication } from "@/lib/types";
 import { Excerpt, StatusBadge, VerifiedBadge } from "@/components/app/badges";
 import { Avatar, Hero, ScoreRing } from "@/components/app/kit";
+import { ProfileLinks } from "@/components/app/links";
 import { Empty, ErrorState, Loading, useAsync } from "@/components/app/states";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ export default function Compare() {
               <Link href={`/recruiter/applications/${a.id}`} className="mt-2 font-heading text-lg font-semibold hover:text-primary">{a.candidate_name ?? a.candidate_email ?? "Candidate"}</Link>
               <div className="mt-2"><ScoreRing value={a.effective_score} size={70} /></div>
               <div className="mt-2"><StatusBadge status={a.status} /></div>
+              <ProfileLinks className="mt-2 justify-center" links={a.resume?.parsed?.contact.links} compact />
               {a.effective_score === best && <p className="mt-2 rounded-full bg-matched/15 px-2 py-0.5 text-xs text-matched">Highest score</p>}
             </div>
           ))}
