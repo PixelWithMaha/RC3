@@ -28,12 +28,20 @@ export default function CandidateDashboard() {
       return ua !== ub ? (ua ? -1 : 1) : ua ? ta - tb : tb - ta;
     })
     .slice(0, 3);
+  // New = nothing done yet (no resume, no applications) → "Welcome", not "Welcome back".
+  const isNew = !resume && apps.length === 0;
+  const firstName = (resume?.parsed?.name ?? "").split(" ")[0];
 
   return (
     <>
-      <Hero eyebrow="Candidate" title={`Welcome back${resume?.parsed?.name ? `, ${resume.parsed.name.split(" ")[0]}` : ""}`}
-        description="Track your resume, applications and interviews in one place."
-        actions={<><Button asChild size="sm"><Link href="/candidate/jobs">Browse jobs</Link></Button><Button asChild size="sm" variant="outline"><Link href="/candidate/resume">Review resume</Link></Button></>}
+      <Hero eyebrow="Candidate"
+        title={isNew ? "Welcome to RC3" : `Welcome back${firstName ? `, ${firstName}` : ""}`}
+        description={isNew
+          ? "Start by uploading your resume. We'll pull out your skills with the exact lines that prove them, then match you to jobs."
+          : "Track your resume, applications and interviews in one place."}
+        actions={isNew
+          ? <Button asChild size="sm"><Link href="/candidate/resume">Upload your resume</Link></Button>
+          : <><Button asChild size="sm"><Link href="/candidate/jobs">Browse jobs</Link></Button><Button asChild size="sm" variant="outline"><Link href="/candidate/resume">Review resume</Link></Button></>}
         art="resume" />
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="dash-card">
