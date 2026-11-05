@@ -112,3 +112,7 @@
 .kit-skeleton { position: relative; overflow: hidden; background: hsl(var(--secondary)); }
 .kit-skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent); animation: kit-shimmer 1.4s infinite; }
 @media (prefers-reduced-motion: reduce) { .kit-float, .kit-scan, .kit-skeleton::after { animation: none !important; } }
+
+@keyframes auth-drift { to { transform: translate(-60px, 50px) scale(1.15); } }
+.auth-aurora { animation: auth-drift 14s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .auth-aurora { animation: none; } }
