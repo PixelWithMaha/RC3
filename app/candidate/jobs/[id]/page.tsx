@@ -60,7 +60,7 @@ export default function JobDetail() {
             <>
               <p className="flex items-center gap-2 text-matched"><CheckCircle2 className="h-4 w-4" /> You applied {new Date(app.created_at).toLocaleDateString()}</p>
               <p className="flex items-center gap-2">Status: <StatusBadge status={app.status} /></p>
-              <PipelineStepper status={app.status} />
+              <PipelineStepper status={app.status} vertical />
               <Button asChild variant="outline" size="sm" className="w-full"><Link href="/candidate/applications">Track application</Link></Button>
             </>
           ) : !canApply ? (

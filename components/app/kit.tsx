@@ -139,11 +139,38 @@ const STEPS: { key: ApplicationStatus; label: string }[] = [
 ];
 const ORDER: ApplicationStatus[] = ["submitted", "parsed", "ai_assessed", "recruiter_review", "shortlisted", "interview", "selected"];
 
-export function PipelineStepper({ status, reached }: { status: ApplicationStatus; reached?: ApplicationStatus[] }) {
+export function PipelineStepper({ status, reached, vertical }: { status: ApplicationStatus; reached?: ApplicationStatus[]; vertical?: boolean }) {
   const rejected = status === "rejected";
   const furthest = Math.max(...(reached ?? [status]).map((s) => ORDER.indexOf(s)), rejected ? 0 : ORDER.indexOf(status));
+  if (vertical) {
+    // Narrow containers (e.g. a side panel): one step per row so labels never overflow.
+    return (
+      <ol className="relative space-y-2.5" aria-label="Application progress">
+        {STEPS.map((s, i) => {
+          const idx = ORDER.indexOf(s.key);
+          const done = idx <= furthest;
+          const current = !rejected && (idx === furthest || (s.key === "ai_assessed" && status === "parsed"));
+          const isDecision = s.key === "selected";
+          const bad = isDecision && rejected;
+          const label = isDecision ? (rejected ? "Not selected" : status === "selected" ? "Selected" : "Decision") : s.label;
+          return (
+            <li key={s.key} className="relative flex items-center gap-3">
+              {i < STEPS.length - 1 && <span aria-hidden className={cn("absolute left-[11px] top-6 h-[calc(100%-4px)] w-0.5 rounded-full", idx < furthest ? "bg-matched" : "bg-border")} />}
+              <span className={cn("relative grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
+                bad ? "border-absent bg-absent/20 text-absent" : done ? "border-matched bg-matched text-background" : "border-border bg-surface text-muted-foreground",
+                current && "ring-4 ring-matched/20")}>
+                {bad ? "✕" : done ? "✓" : i + 1}
+              </span>
+              <span className={cn("text-sm", current ? "font-medium text-foreground" : done || bad ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+              {current && <span className="ml-auto rounded-full bg-matched/15 px-2 py-0.5 text-[11px] text-matched">Current</span>}
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
   return (
-    <ol className="flex w-full items-center" aria-label="Application progress">
+    <ol className="flex w-full min-w-0 items-center" aria-label="Application progress">
       {STEPS.map((s, i) => {
         const idx = ORDER.indexOf(s.key);
         const done = idx <= furthest;
@@ -159,7 +186,7 @@ export function PipelineStepper({ status, reached }: { status: ApplicationStatus
                 current && "ring-4 ring-matched/20")}>
                 {isDecision && rejected ? "✕" : done ? "✓" : i + 1}
               </span>
-              <span className={cn("whitespace-nowrap text-[10px] sm:text-[11px]", done || (isDecision && rejected) ? "text-foreground" : "text-muted-foreground")}>
+              <span className={cn("whitespace-nowrap text-[10px] sm:text-[11px]", !current && "max-sm:hidden", done || (isDecision && rejected) ? "text-foreground" : "text-muted-foreground")}>
                 {isDecision ? (rejected ? "Not selected" : status === "selected" ? "Selected" : "Decision") : s.label}
               </span>
             </div>
