@@ -6,7 +6,8 @@ import { getMyApplications, getMyInterviews, getMyResume, getRecommendations } f
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/app/badges";
-import { Empty, ErrorState, Loading, PageHeader, useAsync } from "@/components/app/states";
+import { Empty, ErrorState, Loading, useAsync } from "@/components/app/states";
+import { Hero } from "@/components/app/kit";
 
 export default function CandidateDashboard() {
   const { data, error, loading, reload } = useAsync(async () => {
@@ -30,9 +31,12 @@ export default function CandidateDashboard() {
 
   return (
     <>
-      <PageHeader title="Your dashboard" description="Track your resume, applications and interviews." />
+      <Hero eyebrow="Candidate" title={`Welcome back${resume?.parsed?.name ? `, ${resume.parsed.name.split(" ")[0]}` : ""}`}
+        description="Track your resume, applications and interviews in one place."
+        actions={<><Button asChild size="sm"><Link href="/candidate/jobs">Browse jobs</Link></Button><Button asChild size="sm" variant="outline"><Link href="/candidate/resume">Review resume</Link></Button></>}
+        art="resume" />
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="dash-card">
           <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-primary" /> Resume</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
             {!resume ? (
@@ -48,14 +52,14 @@ export default function CandidateDashboard() {
             </Button>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="dash-card" style={{ animationDelay: "70ms" }}>
           <CardHeader className="pb-2"><CardTitle className="text-base">Applications</CardTitle></CardHeader>
           <CardContent className="text-sm">
             <p className="font-heading text-3xl font-bold">{apps.length}</p>
             <p className="text-muted-foreground">{apps.filter((a) => ["shortlisted", "interview", "selected"].includes(a.status)).length} progressed</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="dash-card" style={{ animationDelay: "140ms" }}>
           <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> Interviews</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {shown.length === 0 && <p className="text-muted-foreground">None scheduled yet.</p>}

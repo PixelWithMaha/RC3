@@ -6,8 +6,9 @@ import { ArrowLeft } from "lucide-react";
 import { getApplication } from "@/lib/api";
 import { WEIGHTS } from "@/lib/ai/scoring";
 import type { RankedApplication } from "@/lib/types";
-import { Excerpt, ScorePill, StatusBadge, VerifiedBadge } from "@/components/app/badges";
-import { Empty, ErrorState, Loading, PageHeader, useAsync } from "@/components/app/states";
+import { Excerpt, StatusBadge, VerifiedBadge } from "@/components/app/badges";
+import { Avatar, Hero, ScoreRing } from "@/components/app/kit";
+import { Empty, ErrorState, Loading, useAsync } from "@/components/app/states";
 import { cn } from "@/lib/utils";
 
 type App = NonNullable<Awaited<ReturnType<typeof getApplication>>>;
@@ -17,7 +18,7 @@ export default function Compare() {
   const ids = (useSearchParams().get("ids") ?? "").split(",").filter(Boolean).slice(0, 4);
   const { data, error, loading, reload } = useAsync(async () => (await Promise.all(ids.map(getApplication))).filter(Boolean) as App[], [ids.join(",")]);
 
-  if (ids.length < 2) return <Empty title="Pick at least two applicants">Tick candidates on a job&apos;s applicant list, then press Compare.</Empty>;
+  if (ids.length < 2) return <Empty art="compare" title="Pick at least two applicants">Tick candidates on a job&apos;s applicant list, then press Compare.</Empty>;
   if (loading) return <Loading />;
   if (error || !data) return <ErrorState message={error ?? "Could not load"} onRetry={reload} />;
   const jobId = data[0]?.job_id;
@@ -31,15 +32,17 @@ export default function Compare() {
           <ArrowLeft className="h-4 w-4" /> {data[0].job_title}
         </Link>
       )}
-      <PageHeader title="Compare candidates" description="Same job, same evidence rules. Decisions stay with you." />
+      <Hero eyebrow="Side by side" title="Compare candidates" description="Same job, same evidence rules. Decisions stay with you." art="compare" />
       <div className="overflow-x-auto">
         <div className="grid min-w-[720px] gap-3" style={{ gridTemplateColumns: `160px repeat(${data.length}, minmax(0, 1fr))` }}>
           <div />
           {data.map((a) => (
-            <div key={a.id} className={cn("rounded-2xl border bg-surface p-4", a.effective_score === best ? "border-matched/60" : "border-border")}>
-              <Link href={`/recruiter/applications/${a.id}`} className="font-heading text-lg font-semibold hover:text-primary">{a.candidate_name ?? a.candidate_email ?? "Candidate"}</Link>
-              <div className="mt-2 flex items-center gap-2"><ScorePill score={a.ai_score} override={a.override_score} /><StatusBadge status={a.status} /></div>
-              {a.effective_score === best && <p className="mt-2 text-xs text-matched">Highest score</p>}
+            <div key={a.id} className={cn("dash-card flex flex-col items-center rounded-2xl border bg-surface p-4 text-center", a.effective_score === best ? "border-matched/60 shadow-[0_0_40px_-12px_rgba(45,212,191,0.55)]" : "border-border")}>
+              <Avatar name={a.candidate_name ?? a.candidate_email} size={48} />
+              <Link href={`/recruiter/applications/${a.id}`} className="mt-2 font-heading text-lg font-semibold hover:text-primary">{a.candidate_name ?? a.candidate_email ?? "Candidate"}</Link>
+              <div className="mt-2"><ScoreRing value={a.effective_score} size={70} /></div>
+              <div className="mt-2"><StatusBadge status={a.status} /></div>
+              {a.effective_score === best && <p className="mt-2 rounded-full bg-matched/15 px-2 py-0.5 text-xs text-matched">Highest score</p>}
             </div>
           ))}
 

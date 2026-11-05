@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ErrorState, Loading, PageHeader, useAction, useAsync } from "@/components/app/states";
+import { ErrorState, Loading, useAction, useAsync } from "@/components/app/states";
+import { Hero } from "@/components/app/kit";
 
 const SUGGESTED = ["Backend", "Frontend", "Data", "DevOps", "Machine learning", "Fintech", "Healthcare", "Remote", "Startups"];
 
@@ -18,7 +19,7 @@ export default function ProfilePage() {
   if (error || !data) return <ErrorState message={error ?? "Could not load profile"} onRetry={reload} />;
   return (
     <>
-      <PageHeader title="Your profile" description="Your contact details stay private: they're removed before any AI scoring. Interests help us recommend jobs." />
+      <Hero eyebrow="Account" title="Your profile" description="Your contact details stay private: they're removed before any AI scoring. Interests help us recommend jobs." art="profile" />
       <ProfileForm key={data.id} profile={data} onSaved={setData} />
     </>
   );

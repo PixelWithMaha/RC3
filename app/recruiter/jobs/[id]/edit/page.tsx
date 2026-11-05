@@ -3,7 +3,8 @@
 import { useParams } from "next/navigation";
 import { getJob } from "@/lib/api";
 import { JobForm } from "@/components/app/job-form";
-import { ErrorState, Loading, PageHeader, useAsync } from "@/components/app/states";
+import { ErrorState, Loading, useAsync } from "@/components/app/states";
+import { Hero } from "@/components/app/kit";
 
 export default function EditJob() {
   const { id } = useParams<{ id: string }>();
@@ -12,7 +13,7 @@ export default function EditJob() {
   if (error || !job) return <ErrorState message={error ?? "Job not found"} onRetry={reload} />;
   return (
     <>
-      <PageHeader title={`Edit · ${job.title}`} />
+      <Hero eyebrow="Edit job" title={job.title} description="Changing skills or the description re-computes the job embedding." art="jobs" />
       <JobForm job={job} />
     </>
   );

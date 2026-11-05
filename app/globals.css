@@ -102,3 +102,13 @@
   .rs-pop, .rs-out, .rs-spin { animation: none !important; }
   .rs-lift, .rs-nudge { transition: none !important; }
 }
+
+/* ---------- Shared app motion ---------- */
+@keyframes kit-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes kit-shimmer { 100% { transform: translateX(100%); } }
+@keyframes kit-scan { 0% { transform: translateY(-10%); } 100% { transform: translateY(110%); } }
+.kit-float { animation: kit-float 6s ease-in-out infinite; }
+.kit-scan { animation: kit-scan 3.2s linear infinite; }
+.kit-skeleton { position: relative; overflow: hidden; background: hsl(var(--secondary)); }
+.kit-skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent); animation: kit-shimmer 1.4s infinite; }
+@media (prefers-reduced-motion: reduce) { .kit-float, .kit-scan, .kit-skeleton::after { animation: none !important; } }

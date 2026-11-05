@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Inbox, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { Illustration, type Illus } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -51,8 +52,8 @@ export function useAction() {
 
 export function Loading({ label = "Loading…", className }: { label?: string; className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2 py-10 text-sm text-muted-foreground", className)}>
-      <Loader2 className="h-4 w-4 animate-spin" /> {label}
+    <div role="status" className={cn("flex items-center gap-2 py-10 text-sm text-muted-foreground", className)}>
+      <Loader2 className="h-4 w-4 animate-spin text-primary" /> {label}
     </div>
   );
 }
@@ -71,10 +72,10 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+export function Empty({ title, children, action, art = "inbox" }: { title: string; children?: ReactNode; action?: ReactNode; art?: Illus }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-border px-6 py-12 text-center">
-      <Inbox className="mb-3 h-8 w-8 text-muted-foreground" />
+    <div className="dash-card flex flex-col items-center rounded-2xl border border-dashed border-border bg-surface/40 px-6 py-10 text-center">
+      <div className="kit-float mb-3"><Illustration kind={art} size={96} /></div>
       <p className="font-heading font-semibold">{title}</p>
       {children && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{children}</p>}
       {action && <div className="mt-4">{action}</div>}

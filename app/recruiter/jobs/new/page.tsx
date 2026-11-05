@@ -1,10 +1,10 @@
 import { JobForm } from "@/components/app/job-form";
-import { PageHeader } from "@/components/app/states";
+import { Hero } from "@/components/app/kit";
 
 export default function NewJob() {
   return (
     <>
-      <PageHeader title="New job" description="Paste a description and let AI extract the requirements. You review before publishing." />
+      <Hero eyebrow="Create" title="New job" description="Paste a description and let AI extract the requirements. You review before publishing." art="jobs" />
       <JobForm />
     </>
   );

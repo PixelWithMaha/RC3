@@ -7,7 +7,8 @@ import {
   addNote, changeApplicationStatus, deleteQuestion, generateQuestions, getApplicationEvents, getInterviews,
   getNotes, getQuestions, overrideScore, saveInterviewFeedback, scheduleInterview, updateQuestion,
 } from "@/lib/api";
-import type { ApplicationStatus, ConflictCheckResponse, Difficulty, InterviewFeedback, InterviewType, RankedApplication } from "@/lib/types";
+import type { ApplicationStatus, ConflictCheckResponse, Difficulty, InterviewFeedback, InterviewType, Job, RankedApplication } from "@/lib/types";
+import { sameSkill } from "@/lib/ai/normalize";
 import { WEIGHTS } from "@/lib/ai/scoring";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -398,6 +399,48 @@ export function FairnessCard({ applicationId }: { applicationId: string }) {
             </details>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- side by side: job requires ↔ resume shows (GAP-2)
+export function RequirementsVsEvidence({ app, job }: { app: RankedApplication; job: Job }) {
+  const x = app.ai_explanation;
+  if (!x) return null;
+  const reqs = [...job.required_skills.map((s) => ({ ...s, required: true })), ...job.preferred_skills.map((s) => ({ ...s, required: false }))];
+  return (
+    <Card className="dash-card">
+      <CardHeader>
+        <CardTitle className="text-base">Job requires ↔ Resume shows</CardTitle>
+        <CardDescription>Each requirement next to the exact resume line the AI used, checked against the raw text.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {reqs.map((r, i) => {
+          const m = x.matched.find((y) => sameSkill(y.skill, r.name));
+          const g = x.gaps.find((y) => sameSkill(y.skill, r.name));
+          const tone = m?.strength === "full" ? "matched" : m ? "partial" : g?.type === "explicitly_lacking" ? "absent" : "missing";
+          return (
+            <div key={r.name} className="dash-slide grid gap-2 sm:grid-cols-[200px_1fr]" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2.5 text-sm">
+                <span className="font-medium">{r.name}{!r.required && <span className="ml-1 text-[11px] text-muted-foreground">pref.</span>}</span>
+                <span className="flex gap-0.5">{Array.from({ length: 5 }, (_, d) => <i key={d} className={cn("h-1.5 w-1.5 rounded-full", d < r.importance ? "bg-primary" : "bg-secondary")} />)}</span>
+              </div>
+              <div className={cn("rounded-xl border px-3 py-2.5 text-sm",
+                tone === "matched" ? "border-matched/40 bg-matched/5" : tone === "partial" ? "border-missing/40 bg-missing/5" : tone === "absent" ? "border-absent/40 bg-absent/5" : "border-dashed border-missing/40")}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn("text-[11px] font-semibold uppercase tracking-wider",
+                    tone === "matched" ? "text-matched" : tone === "absent" ? "text-absent" : "text-missing")}>
+                    {tone === "matched" ? "✓ Matched" : tone === "partial" ? `Partial${m?.resume_skill ? ` via ${m.resume_skill}` : ""}` : tone === "absent" ? "Confirmed absence" : "Missing evidence"}
+                  </span>
+                  {m && <VerifiedBadge verified={m.verified} />}
+                </div>
+                {(m?.excerpt || g?.excerpt) && <p className="mt-1"><Excerpt>{m?.excerpt || g?.excerpt}</Excerpt></p>}
+                {!m && g && <p className="mt-1 text-xs text-muted-foreground">Learning area: {g.learning_suggestion}</p>}
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
