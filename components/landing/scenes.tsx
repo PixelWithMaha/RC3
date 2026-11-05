@@ -107,7 +107,7 @@ function HeroInner({ p }: { p: MotionValue<number> }) {
         {PILE.map((c, i) => <PileCard key={c.n} i={i} p={p} {...c} />)}
       </div>
       <motion.div style={{ y: copyY, opacity: copyOpacity }} className="relative z-10 -mt-24">
-        <p className="mb-5 font-mono text-xs uppercase tracking-[0.2em] text-primary">RC3 · Recruitment &amp; talent intelligence</p>
+        <p className="mb-5 font-mono text-xs uppercase tracking-[0.2em] text-primary">TalentBridge · Where candidates and recruiters meet</p>
         <Reveal as="h1" text="The Evidence Trail" className="text-5xl font-bold leading-[1.02] sm:text-7xl lg:text-[92px]" delay={0.2} />
         <motion.p
           initial={{ opacity: 0, y: 16 }}
@@ -226,7 +226,7 @@ export function MatchScene() {
       {(p) => (
         <>
           <SceneCopy title="Meaning, not just keywords">
-            Job requirements on the left, resume evidence on the right. A match needs proof — when there is none, RC3 says so.
+            Job requirements on the left, resume evidence on the right. A match needs proof — when there is none, TalentBridge says so.
           </SceneCopy>
           <MatchVisual p={p} />
         </>

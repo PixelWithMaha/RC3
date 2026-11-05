@@ -35,7 +35,7 @@ export default function CandidateDashboard() {
   return (
     <>
       <Hero eyebrow="Candidate"
-        title={isNew ? "Welcome to RC3" : `Welcome back${firstName ? `, ${firstName}` : ""}`}
+        title={isNew ? "Welcome to TalentBridge" : `Welcome back${firstName ? `, ${firstName}` : ""}`}
         description={isNew
           ? "Start by uploading your resume. We'll pull out your skills with the exact lines that prove them, then match you to jobs."
           : "Track your resume, applications and interviews in one place."}

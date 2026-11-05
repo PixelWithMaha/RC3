@@ -66,7 +66,7 @@ export function AuthStory() {
         </Stage>
         <Connector on={step >= 1} />
         <Stage i={1} step={step}>
-          <Label i={1} text="RC3 AI" />
+          <Label i={1} text="TalentBridge AI" />
           <div className="relative grid gap-1.5 overflow-hidden rounded-[9px] bg-white p-2.5">
             <span className="h-1.5 rounded bg-[#D3D7E8]" />
             <Hl on={step >= 1} i={0}>Built REST APIs in Django</Hl>

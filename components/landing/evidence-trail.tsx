@@ -40,7 +40,7 @@ export function EvidenceTrail() {
         <FinalCta />
       </main>
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        RC3 · Next.js, Supabase, pgvector and Gemini · AI recommends. You decide.
+        TalentBridge · Next.js, Supabase, pgvector and Gemini · AI recommends. You decide.
       </footer>
     </MotionConfig>
   );
@@ -66,9 +66,9 @@ function Nav() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-heading font-bold">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">
-            R
+            T
           </span>
-          RC3
+          TalentBridge
           <span className="hidden font-normal text-muted-foreground sm:inline">· Evidence Trail</span>
         </Link>
         <nav className="flex items-center gap-2">

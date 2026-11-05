@@ -48,8 +48,8 @@ export function AppShell({ role, children }: { role: Role; children: ReactNode }
       <header className="sticky top-0 z-30 border-b border-border bg-background">
         <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-4 px-4 sm:px-6">
           <Link href={`/${role}`} className="flex items-center gap-2 font-heading font-bold">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[15px] text-primary-foreground">R</span>
-            RC3
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[15px] text-primary-foreground">T</span>
+            TalentBridge
           </Link>
           <nav className="flex flex-1 gap-1 overflow-x-auto" aria-label="Sections">
             {NAV[role].map((n) => (

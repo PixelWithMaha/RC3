@@ -1,4 +1,6 @@
-# RC3 — Recruitment & Talent Intelligence Platform
+# TalentBridge — Recruitment & Talent Intelligence Platform
+
+_Where candidates and recruiters meet on evidence._
 
 AI-assisted hiring where **every score points back to a line in the resume**. Recruiters see matched skills, gaps and evidence; the AI only recommends — every shortlist, rejection and decision is a recruiter action written to an audit trail.
 

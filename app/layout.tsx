@@ -9,7 +9,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "RC3 · The Evidence Trail",
+  title: "TalentBridge · Hiring backed by evidence",
   description:
     "AI-assisted recruitment where every score links back to resume evidence. AI recommends, recruiters decide.",
 };

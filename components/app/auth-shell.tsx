@@ -8,7 +8,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="relative flex flex-col px-6 py-8 sm:px-10">
         <Link href="/" className="flex items-center gap-2 font-heading text-lg font-bold">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[15px] text-primary-foreground">R</span> RC3
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[15px] text-primary-foreground">T</span> TalentBridge
         </Link>
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="dash-card w-full max-w-sm">{children}</div>
