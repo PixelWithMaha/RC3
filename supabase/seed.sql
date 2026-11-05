@@ -1,0 +1,10 @@
+-- Demo data (PRD §12).
+-- Accounts are created through the Supabase admin API (passwords hashed by Supabase Auth, never in SQL):
+--   DEMO_PASSWORD=... node --env-file=.env.local scripts/seed-demo.mjs accounts
+-- Demo resumes live in public/demo/*.pdf (strong / partial / weak). Upload them through the app so the
+-- real parse → embed → match pipeline runs (no hardcoded AI output).
+--
+-- Optional reset between rehearsals — removes all applications and jobs of the demo recruiter:
+-- delete from public.applications where job_id in
+--   (select j.id from public.jobs j join public.profiles p on p.id = j.recruiter_id where p.email = 'recruiter@rc3.demo');
+-- delete from public.jobs where recruiter_id in (select id from public.profiles where email = 'recruiter@rc3.demo');

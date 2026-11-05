@@ -1,0 +1,51 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1005 >>
+stream
+BT /F1 11 Tf 50 790 Td 16 TL
+(Ayesha Khan | ayesha.khan@example.com | +92 300 1110001 | Karachi) Tj T*
+(Summary: Backend engineer with 5 years of experience building Python web services.) Tj T*
+(Skills: Python, Django, Django REST Framework, PostgreSQL, Docker, Redis, Celery, Git) Tj T*
+() Tj T*
+(Experience) Tj T*
+(Senior Backend Developer, Nimbus Tech \(2021 - 2025\)) Tj T*
+(- Built REST APIs in Django and PostgreSQL serving 80k daily users.) Tj T*
+(- Containerized every service with Docker and Docker Compose for CI/CD.) Tj T*
+(- Tuned PostgreSQL queries and indexes, cutting p95 latency by 40%.) Tj T*
+(Backend Developer, CodeWorks \(2020 - 2021\)) Tj T*
+(- Wrote Python services and Celery workers for billing jobs.) Tj T*
+() Tj T*
+(Projects) Tj T*
+(ShopAPI: e-commerce backend with Django REST Framework, PostgreSQL and Docker.) Tj T*
+(TaskFlow: Dockerized Django app deployed to AWS with GitHub Actions.) Tj T*
+() Tj T*
+(Education) Tj T*
+(BSc Computer Science, FAST NUCES, 2016 - 2020) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001298 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1368
+%%EOF

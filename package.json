@@ -5,7 +5,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:pdfs": "node scripts/seed-demo.mjs pdfs",
+    "seed:accounts": "node --env-file=.env.local scripts/seed-demo.mjs accounts"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",
