@@ -53,7 +53,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     // API routes check session + role themselves and answer with JSON 401/403, never a redirect
-    !request.nextUrl.pathname.startsWith("/api")
+    !request.nextUrl.pathname.startsWith("/api") &&
+    !request.nextUrl.pathname.startsWith("/promo") // public animated product video
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
